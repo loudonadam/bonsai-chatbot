@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bonsai Chatbot</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f2f2f2; }
+    #app { max-width: 900px; margin: 0 auto; padding: 20px; }
+    .card { background: #fff; padding: 16px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 12px; }
+    .messages { max-height: 500px; overflow-y: auto; }
+    .message { margin-bottom: 12px; }
+    .message.user { text-align: right; }
+    .sources { font-size: 0.9em; color: #555; margin-top: 8px; }
+    textarea { width: 100%; resize: vertical; min-height: 80px; padding: 8px; }
+    button { padding: 10px 16px; background: #2f855a; color: white; border: none; border-radius: 6px; cursor: pointer; }
+    button:disabled { background: #9ae6b4; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <h1>Bonsai Chatbot</h1>
+    <div class="card messages" id="messages"></div>
+    <div class="card">
+      <label for="question">Ask a question about your bonsai notes:</label><br />
+      <textarea id="question" placeholder="e.g., When should I repot black pine?" ></textarea>
+      <div style="margin-top: 8px; display: flex; gap: 8px;">
+        <button id="askBtn" onclick="ask()">Ask</button>
+        <button id="ingestBtn" onclick="ingest()">Rebuild KB</button>
+      </div>
+      <div id="status" style="margin-top: 8px; color: #555;"></div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = 'http://localhost:8000';
+
+    function addMessage(text, who = 'bot', sources = []) {
+      const messages = document.getElementById('messages');
+      const div = document.createElement('div');
+      div.className = `message ${who}`;
+      div.innerHTML = `<div><strong>${who === 'user' ? 'You' : 'Bot'}:</strong> ${text.replace(/\n/g, '<br>')}</div>`;
+      if (sources.length && who === 'bot') {
+        const s = document.createElement('div');
+        s.className = 'sources';
+        s.innerHTML = '<strong>Sources:</strong> ' + sources.map(src => src.source).join(', ');
+        div.appendChild(s);
+      }
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    async function ask() {
+      const btn = document.getElementById('askBtn');
+      const textarea = document.getElementById('question');
+      const status = document.getElementById('status');
+      const question = textarea.value.trim();
+      if (!question) return;
+      btn.disabled = true;
+      addMessage(question, 'user');
+      status.textContent = 'Querying...';
+      try {
+        const res = await fetch(`${API_BASE}/ask`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question })
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        addMessage(data.answer, 'bot', data.sources || []);
+      } catch (err) {
+        addMessage(`Error: ${err}`, 'bot');
+      } finally {
+        btn.disabled = false;
+        status.textContent = '';
+      }
+    }
+
+    async function ingest() {
+      const btn = document.getElementById('ingestBtn');
+      const status = document.getElementById('status');
+      btn.disabled = true;
+      status.textContent = 'Rebuilding knowledge base...';
+      try {
+        const res = await fetch(`${API_BASE}/ingest`, { method: 'POST' });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        status.textContent = `Ingested ${data.chunks} chunks.`;
+      } catch (err) {
+        status.textContent = `Error: ${err}`;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>
