@@ -1,0 +1,109 @@
+import asyncio
+import pathlib
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
+
+import httpx
+import yaml
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
+from app import rag
+
+
+@dataclass
+class AppConfig:
+    model: Dict[str, Any]
+    server: Dict[str, Any]
+    ui: Dict[str, Any]
+    embedding: Dict[str, Any]
+    retrieval: Dict[str, Any]
+    data: Dict[str, Any]
+
+    @staticmethod
+    def load(path: pathlib.Path) -> "AppConfig":
+        with path.open("r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        return AppConfig(**data)
+
+
+def get_app(config_path: pathlib.Path = pathlib.Path("config.yaml")) -> FastAPI:
+    app_config = AppConfig.load(config_path)
+
+    rag_config = rag.RAGConfig(
+        index_dir=pathlib.Path(app_config.data["index_dir"]),
+        embedding_model=app_config.embedding["model"],
+        device=app_config.embedding.get("device", "cpu"),
+        chunk_size=int(app_config.retrieval.get("chunk_size", 800)),
+        chunk_overlap=int(app_config.retrieval.get("chunk_overlap", 120)),
+        top_k=int(app_config.retrieval.get("k", 4)),
+    )
+
+    app = FastAPI(title="Bonsai Chatbot API", version="1.0")
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    class AskRequest(BaseModel):
+        question: str
+
+    class AskResponse(BaseModel):
+        answer: str
+        sources: List[Dict[str, str]]
+
+    @app.get("/health")
+    async def health() -> Dict[str, str]:
+        return {"status": "ok"}
+
+    @app.post("/ask", response_model=AskResponse)
+    async def ask(payload: AskRequest):
+        hits = rag.retrieve(payload.question, config=rag_config)
+        prompt = rag.build_prompt(payload.question, hits)
+
+        api_base = app_config.model.get("api_base", "http://127.0.0.1:8080/v1")
+        body = {
+            "model": "local-llm",
+            "messages": [
+                {"role": "system", "content": "You are a helpful bonsai assistant."},
+                {"role": "user", "content": prompt},
+            ],
+            "max_tokens": app_config.model.get("max_tokens", 512),
+            "temperature": app_config.model.get("temperature", 0.7),
+            "stream": False,
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=120) as client:
+                resp = await client.post(f"{api_base}/chat/completions", json=body)
+                resp.raise_for_status()
+                data = resp.json()
+                content: Optional[str] = data.get("choices", [{}])[0].get("message", {}).get("content")
+        except Exception as exc:  # pragma: no cover - runtime errors reported to user
+            raise HTTPException(status_code=500, detail=f"Model call failed: {exc}")
+
+        if not content:
+            raise HTTPException(status_code=500, detail="Empty response from model")
+
+        return AskResponse(answer=content.strip(), sources=list(hits))
+
+    class IngestResponse(BaseModel):
+        chunks: int
+
+    @app.post("/ingest", response_model=IngestResponse)
+    async def ingest():
+        from app.ingest import run_ingest
+
+        loop = asyncio.get_event_loop()
+        count = await loop.run_in_executor(None, run_ingest, config_path)
+        return IngestResponse(chunks=count)
+
+    return app
+
+
+app = get_app()
