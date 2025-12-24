@@ -16,7 +16,16 @@ Set-Location $repoRoot
 Write-Host "[INFO] Bonsai Chatbot quick launch (single PowerShell window)" -ForegroundColor Cyan
 Write-Host "[INFO] Repo root: $repoRoot"
 
-if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
+$pythonCmd = "python"
+$venvPython = Join-Path $repoRoot ".venv\\Scripts\\python.exe"
+if (Test-Path $venvPython) {
+  $pythonCmd = $venvPython
+  Write-Host "[INFO] Using venv Python at $venvPython" -ForegroundColor Cyan
+} else {
+  Write-Host "[INFO] No .venv detected; using system Python from PATH." -ForegroundColor Yellow
+}
+
+if ((-not (Test-Path $venvPython)) -and (-not (Get-Command python -ErrorAction SilentlyContinue))) {
   Write-Error "Python not found on PATH. Install Python 3.11+ and reopen this window."
   exit 1
 }
@@ -50,10 +59,20 @@ function Start-LoggedProcess {
   param(
     [string]$Name,
     [string]$FilePath,
-    [string[]]$Args
+    [string[]]$ArgumentList = @()
   )
   $logFile = Join-Path $logsDir "$Name.log"
-  $proc = Start-Process -PassThru -WindowStyle Hidden -FilePath $FilePath -ArgumentList $Args -RedirectStandardOutput $logFile -RedirectStandardError $logFile
+  $startParams = @{
+    PassThru               = $true
+    WindowStyle            = "Hidden"
+    FilePath               = $FilePath
+    RedirectStandardOutput = $logFile
+    RedirectStandardError  = $logFile
+  }
+  if ($ArgumentList -and ($ArgumentList.Count -gt 0)) {
+    $startParams.ArgumentList = $ArgumentList
+  }
+  $proc = Start-Process @startParams
   Write-Host "[STARTED] $Name -> $logFile"
   return $proc
 }
@@ -72,10 +91,10 @@ if (-not $SkipModel) {
 }
 
 $apiArgs = @("-m", "uvicorn", "app.main:app", "--host", $ApiHost, "--port", $ApiPort)
-$processes += Start-LoggedProcess -Name "api" -FilePath "python" -Args $apiArgs
+$processes += Start-LoggedProcess -Name "api" -FilePath $pythonCmd -ArgumentList $apiArgs
 
 $uiArgs = @("-m", "http.server", "$UiPort", "-d", "ui")
-$processes += Start-LoggedProcess -Name "ui" -FilePath "python" -Args $uiArgs
+$processes += Start-LoggedProcess -Name "ui" -FilePath $pythonCmd -ArgumentList $uiArgs
 
 if (-not $NoBrowser) {
   Write-Host "[INFO] Opening browser to http://localhost:$UiPort"
