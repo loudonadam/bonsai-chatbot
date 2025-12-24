@@ -51,13 +51,22 @@ A minimal, self-hosted RAG chatbot tailored for bonsai notes. Runs locally on Wi
      ```
    - If anything fails, the script stays open and prints the reason (missing Python, missing config/model, blocked download, etc.).
    - The script now automatically switches to the repo root, so keep `config.yaml` in the top-level folder.
-7) **Launch servers and UI**
-   - Double-click `scripts\launch.bat`. You will see:
-     - A window for `llama-server.exe` (if the binary + model path are found).
-     - A window for the FastAPI server.
-     - A window for the static UI server.
-   - Each window stays open and shows logs/errors. If the llama server is missing, the script prints a warning and continues so you can start it manually.
-   - Your browser will open to `http://localhost:3000`.
+7) **Launch servers and UI (manual steps if double-click doesn’t work)**
+   - From an **existing PowerShell or Command Prompt** window at the repo root (with the venv active):
+     - Start the API:  
+       ```powershell
+       python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+       ```
+     - Serve the UI in another shell:  
+       ```powershell
+       python -m http.server 3000 -d ui
+       ```
+     - (Optional) Start the llama.cpp server if you downloaded it:  
+       ```powershell
+       scripts\start_model.bat
+       ```
+   - Then open <http://localhost:3000> in your browser.
+   - If you prefer the helper script, you can still try `cmd.exe /c scripts\launch.bat` from an open shell to keep logs visible.
 
 ## Commands (manual, if you prefer)
 - Rebuild index:
