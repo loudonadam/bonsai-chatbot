@@ -67,7 +67,12 @@ def ingest_directory(config: RAGConfig, source_dir: pathlib.Path, collection_nam
         local_files_only=config.local_files_only,
     )
     client = build_client(config.index_dir)
-    collection = ensure_collection(client, collection_name, embedding_fn)
+
+    # Recreate the collection to ensure a clean slate. Chromadb's delete API no longer
+    # supports the $exists operator we previously used for a full wipe.
+    if collection_name in {col.name for col in client.list_collections()}:
+        client.delete_collection(name=collection_name)
+    collection = client.create_collection(name=collection_name, embedding_function=embedding_fn)
 
     documents: Documents = []
     metadatas: Metadatas = []
@@ -85,7 +90,6 @@ def ingest_directory(config: RAGConfig, source_dir: pathlib.Path, collection_nam
     if not documents:
         return 0
 
-    collection.delete(where={"source": {"$exists": True}})
     collection.add(documents=documents, metadatas=metadatas, ids=ids)
     return len(documents)
 
