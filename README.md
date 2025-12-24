@@ -45,28 +45,43 @@ A minimal, self-hosted RAG chatbot tailored for bonsai notes. Runs locally on Wi
 5) **Add documents to index**
    - Put your `.txt` or `.md` sources in `data\raw`. (The scripts create this folder if missing.)
 6) **Build the index (ingestion)**
-   - Double-click `scripts\rebuild_kb.bat` **or** run:
+   - Recommended (explicit PowerShell steps so you can see errors):
+     1. Open **PowerShell**.
+     2. `Set-Location C:\path\to\bonsai-chatbot` (repo root).
+     3. (If you created a venv) `.\.venv\Scripts\Activate.ps1`
+     4. Set the module path for this shell: `set PYTHONPATH=$PWD`
+     5. Run ingestion:  
+        ```powershell
+        python -m app.ingest --config config.yaml
+        ```
+   - If you prefer the helper script, you can still run it from the repo root to keep output visible:
      ```powershell
-     python app/ingest.py --config config.yaml
+     scripts\rebuild_kb.bat
      ```
-   - If anything fails, the script stays open and prints the reason (missing Python, missing config/model, blocked download, etc.).
-   - The script now automatically switches to the repo root, so keep `config.yaml` in the top-level folder.
-7) **Launch servers and UI (manual steps if double-click doesn’t work)**
-   - From an **existing PowerShell or Command Prompt** window at the repo root (with the venv active):
-     - Start the API:  
-       ```powershell
-       python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
-       ```
-     - Serve the UI in another shell:  
-       ```powershell
-       python -m http.server 3000 -d ui
-       ```
-     - (Optional) Start the llama.cpp server if you downloaded it:  
-       ```powershell
-       scripts\start_model.bat
-       ```
+   - If anything fails, the PowerShell window will show the exact error (e.g., missing config/model, blocked download).
+7) **Launch servers and UI (manual PowerShell steps; recommended if double-click doesn’t work)**
+   - Open **PowerShell** at the repo root and activate your venv (if using one).
+   - Start the API (keep this window open to see logs/errors):  
+     ```powershell
+     python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+     ```
+   - In a **second** PowerShell window at the repo root (venv active), serve the UI:  
+     ```powershell
+     python -m http.server 3000 -d ui
+     ```
+   - (Optional) If you downloaded `llama-server.exe`, start it in a **third** PowerShell window:  
+     ```powershell
+     scripts\start_model.bat
+     ```
    - Then open <http://localhost:3000> in your browser.
-   - If you prefer the helper script, you can still try `cmd.exe /c scripts\launch.bat` from an open shell to keep logs visible.
+   - If you still want the helper script, run it from an open shell so logs stay visible:  
+     ```powershell
+     cmd.exe /c scripts\launch.bat
+     ```
+   - Common troubleshooting tips in PowerShell:
+     - Ensure `config.yaml` exists in the repo root.
+     - Ensure `PYTHONPATH` is set for the session (`set PYTHONPATH=$PWD`) if you see `ModuleNotFoundError: No module named 'app'`.
+     - Leave each window open to read any traceback or missing-file warnings.
 
 ## Commands (manual, if you prefer)
 - Rebuild index:
