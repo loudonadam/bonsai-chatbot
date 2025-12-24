@@ -22,7 +22,7 @@ $logsDir = Join-Path $repoRoot "logs"
 New-Item -ItemType Directory -Force -Path $logsDir | Out-Null
 $errorLog = Join-Path $logsDir "quick-launch-error.log"
 
-function Fail-And-Pause {
+function FailAndPause {
   param(
     [string]$Message
   )
@@ -39,6 +39,10 @@ function Fail-And-Pause {
 }
 
 try {
+  trap {
+    FailAndPause -Message $_.Exception.Message
+  }
+
   $pythonCmd = "python"
   $venvPython = Join-Path $repoRoot ".venv\\Scripts\\python.exe"
   if (Test-Path $venvPython) {
@@ -105,6 +109,7 @@ try {
       FilePath               = $FilePath
       RedirectStandardOutput = $stdoutLog
       RedirectStandardError  = $stderrLog
+      ErrorAction            = "Stop"
     }
     if ($ArgumentList -and ($ArgumentList.Count -gt 0)) {
       $startParams.ArgumentList = $ArgumentList
@@ -160,5 +165,5 @@ try {
 
   Write-Host "[INFO] All processes stopped." -ForegroundColor Cyan
 } catch {
-  Fail-And-Pause -Message $_.Exception.Message
+  FailAndPause -Message $_.Exception.Message
 }
