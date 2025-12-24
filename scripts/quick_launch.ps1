@@ -61,19 +61,20 @@ function Start-LoggedProcess {
     [string]$FilePath,
     [string[]]$ArgumentList = @()
   )
-  $logFile = Join-Path $logsDir "$Name.log"
+  $stdoutLog = Join-Path $logsDir "$Name-stdout.log"
+  $stderrLog = Join-Path $logsDir "$Name-stderr.log"
   $startParams = @{
     PassThru               = $true
     WindowStyle            = "Hidden"
     FilePath               = $FilePath
-    RedirectStandardOutput = $logFile
-    RedirectStandardError  = $logFile
+    RedirectStandardOutput = $stdoutLog
+    RedirectStandardError  = $stderrLog
   }
   if ($ArgumentList -and ($ArgumentList.Count -gt 0)) {
     $startParams.ArgumentList = $ArgumentList
   }
   $proc = Start-Process @startParams
-  Write-Host "[STARTED] $Name -> $logFile"
+  Write-Host "[STARTED] $Name -> $stdoutLog / $stderrLog"
   return $proc
 }
 

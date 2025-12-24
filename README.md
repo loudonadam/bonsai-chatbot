@@ -90,7 +90,7 @@ A minimal, self-hosted RAG chatbot tailored for bonsai notes. Runs locally on Wi
   - Check for `config.yaml` and `python` on PATH.
   - Create `data/raw` and `data/index` if missing.
   - Launch the API, UI server, and (if available) `llama-server.exe` **without opening extra PowerShell windows**.
-  - Drop logs to `logs/api.log`, `logs/ui.log`, and `logs/llama-server.log`.
+  - Drop logs to `logs/api-stdout.log` / `logs/api-stderr.log`, `logs/ui-stdout.log` / `logs/ui-stderr.log`, and `logs/llama-server-stdout.log` / `logs/llama-server-stderr.log`.
   - Open your browser to `http://localhost:3000` by default.
 - Virtual envs: if a `.venv\Scripts\python.exe` exists in the repo root, the script will auto-use it (so right-click “Run with PowerShell” works). Otherwise it falls back to the system `python`.
 - Press Enter in the same window to cleanly stop all launched processes.
