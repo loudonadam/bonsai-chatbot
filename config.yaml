@@ -13,6 +13,8 @@ ui:
 embedding:
   model: "BAAI/bge-small-en-v1.5"
   device: "cpu"  # set to "cuda", "dml", or similar if you install GPU-capable torch/onnxruntime
+  cache_dir: null  # set to a folder path to store/download embedding models
+  local_files_only: false  # set true to require embeddings to be available locally (no internet)
 retrieval:
   k: 4
   chunk_size: 800

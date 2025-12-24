@@ -1,6 +1,6 @@
 import pathlib
 from dataclasses import dataclass
-from typing import List, Sequence
+from typing import List, Optional, Sequence
 
 import chromadb
 from chromadb.api.types import Documents, EmbeddingFunction, Embeddings, Metadatas
@@ -17,11 +17,33 @@ class RAGConfig:
     chunk_overlap: int
     top_k: int
     device: str = "cpu"
+    cache_dir: Optional[pathlib.Path] = None
+    local_files_only: bool = False
 
 
 class SentenceTransformerEmbedding(EmbeddingFunction):
-    def __init__(self, model_name: str, device: str = "cpu") -> None:
-        self.model = SentenceTransformer(model_name, device=device)
+    def __init__(
+        self,
+        model_name: str,
+        device: str = "cpu",
+        cache_dir: Optional[pathlib.Path] = None,
+        local_files_only: bool = False,
+    ) -> None:
+        try:
+            self.model = SentenceTransformer(
+                model_name,
+                device=device,
+                cache_folder=str(cache_dir) if cache_dir else None,
+                local_files_only=local_files_only,
+            )
+        except Exception as exc:  # pragma: no cover - runtime guardrail
+            hint = (
+                f"Failed to load embedding model '{model_name}'. "
+                "If you are offline, download the model manually and point embedding.model "
+                "to the local folder (or set embedding.local_files_only: true). "
+                f"cache_dir={cache_dir or 'default cache'}"
+            )
+            raise RuntimeError(hint) from exc
 
     def __call__(self, input: Documents) -> Embeddings:  # type: ignore[override]
         return self.model.encode(list(input), normalize_embeddings=True).tolist()
@@ -38,7 +60,12 @@ def ensure_collection(client: chromadb.Client, name: str, embedding_fn: Embeddin
 
 
 def ingest_directory(config: RAGConfig, source_dir: pathlib.Path, collection_name: str = "bonsai") -> int:
-    embedding_fn = SentenceTransformerEmbedding(config.embedding_model, device=config.device)
+    embedding_fn = SentenceTransformerEmbedding(
+        config.embedding_model,
+        device=config.device,
+        cache_dir=config.cache_dir,
+        local_files_only=config.local_files_only,
+    )
     client = build_client(config.index_dir)
     collection = ensure_collection(client, collection_name, embedding_fn)
 
@@ -68,7 +95,12 @@ def retrieve(
     config: RAGConfig,
     collection_name: str = "bonsai",
 ) -> Sequence[dict]:
-    embedding_fn = SentenceTransformerEmbedding(config.embedding_model, device=config.device)
+    embedding_fn = SentenceTransformerEmbedding(
+        config.embedding_model,
+        device=config.device,
+        cache_dir=config.cache_dir,
+        local_files_only=config.local_files_only,
+    )
     client = build_client(config.index_dir)
     collection = ensure_collection(client, collection_name, embedding_fn)
     results = collection.query(query_texts=[query], n_results=config.top_k)
