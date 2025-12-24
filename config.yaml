@@ -1,5 +1,5 @@
 model:
-  path: "models/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf"  # Path to your GGUF model file
+  path: "models/bonsai-gguf.gguf"  # Path to your GGUF model file
   server_binary: "scripts/llama-server.exe"  # Path to llama.cpp's llama-server.exe (optional helper)
   api_base: "http://127.0.0.1:8080/v1"  # llama.cpp server URL (OpenAI-compatible)
   max_tokens: 512
