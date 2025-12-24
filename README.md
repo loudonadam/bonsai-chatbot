@@ -16,33 +16,48 @@ A minimal, self-hosted RAG chatbot tailored for bonsai notes. Runs locally on Wi
   - Download `llama.cpp` Windows binaries: <https://github.com/ggerganov/llama.cpp/releases>
   - Download a model (example): <https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF>
 
-## Quick start (Windows)
-1. **Clone**
+## Quick start (Windows, step-by-step)
+> These steps assume fresh Windows 11. Use PowerShell for the setup commands. Each helper script now leaves its window open and prints clear error messages if something fails.
+
+1) **Clone the repo**
    ```powershell
    git clone <your fork url> BonsaiChat
    cd BonsaiChat
    ```
-2. **Python environment**
+2) **Create and activate a virtual environment**
    ```powershell
    python -m venv .venv
-   .venv\Scripts\activate
+   .\.venv\Scripts\activate
    pip install --upgrade pip
    pip install -r app/requirements.txt
    ```
-3. **Place your model**
-   - Put your GGUF model at `models\bonsai-gguf.gguf` (or update the path in `config.example.yaml`).
-   - Put `llama-server.exe` (from `llama.cpp` release) in `scripts\` or anywhere on PATH.
-4. **Configure**
-   - Copy `config.example.yaml` to `config.yaml` and adjust paths (model path, data folders, ports).
-5. **Add documents**
-   - Drop your trusted sources into `data/raw` (supports `.txt` and `.md` for now).
-6. **Rebuild the knowledge base**
-   - Double-click `scripts\rebuild_kb.bat` (or run `python app/ingest.py --config config.yaml`).
-7. **Launch everything**
-   - Double-click `scripts\launch.bat`. This will:
-     - Start `llama-server.exe` (if configured) for inference.
-     - Start the FastAPI app (Uvicorn) on port 8000.
-     - Open the UI at `http://localhost:3000` (static HTML hitting the API).
+3) **Place model + llama.cpp server**
+   - Download a GGUF model (example: <https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF>).
+   - Put the model at `models\bonsai-gguf.gguf` **or** update `MODEL_PATH` in `scripts\launch.bat` / `scripts\start_model.bat` and `model.path` in `config.yaml` to the file you downloaded.
+   - Download `llama-server.exe` from the llama.cpp Windows release and place it in `scripts\`.
+4) **Configure the app**
+   ```powershell
+   copy config.example.yaml config.yaml
+   ```
+   Then edit `config.yaml`:
+   - Set `model.path` to your GGUF file.
+   - If you must stay offline, set `embedding.local_files_only: true` and set `embedding.model` to a local path or pre-downloaded folder. Optional: set `embedding.cache_dir` to a writable folder for cached models.
+5) **Add documents to index**
+   - Put your `.txt` or `.md` sources in `data\raw`. (The scripts create this folder if missing.)
+6) **Build the index (ingestion)**
+   - Double-click `scripts\rebuild_kb.bat` **or** run:
+     ```powershell
+     python app/ingest.py --config config.yaml
+     ```
+   - If anything fails, the script stays open and prints the reason (missing Python, missing config/model, blocked download, etc.).
+   - The script now automatically switches to the repo root, so keep `config.yaml` in the top-level folder.
+7) **Launch servers and UI**
+   - Double-click `scripts\launch.bat`. You will see:
+     - A window for `llama-server.exe` (if the binary + model path are found).
+     - A window for the FastAPI server.
+     - A window for the static UI server.
+   - Each window stays open and shows logs/errors. If the llama server is missing, the script prints a warning and continues so you can start it manually.
+   - Your browser will open to `http://localhost:3000`.
 
 ## Commands (manual, if you prefer)
 - Rebuild index:
@@ -64,6 +79,15 @@ A minimal, self-hosted RAG chatbot tailored for bonsai notes. Runs locally on Wi
 - `data.raw_dir`: folder containing your documents.
 - `data.index_dir`: where the Chroma index lives.
 - `embedding.model`: HuggingFace model name for embeddings (defaults to `BAAI/bge-small-en-v1.5`).
+- `embedding.cache_dir`: optional folder for caching/downloading the embedding model. Useful if you want to pre-download once.
+- `embedding.local_files_only`: set to `true` to require the embedding model to be available locally (no internet download attempts). Make sure `embedding.model` points to a local path or that the model already exists in `cache_dir`.
+- The app will create `data/raw` and `data/index` if they do not exist yet, but you still need to place your source documents under `data/raw`.
+
+## Troubleshooting the scripts
+- **Nothing happens when I double-click a `.bat` file**: each helper window now stays open and prints an error before exiting. Look for messages like "Python not found", "config.yaml not found", or "Model file not found".
+- **config.yaml not found**: the scripts now change to the repo root automatically, so keep `config.yaml` at the top level (next to `README.md`).
+- **Model download blocked (offline/proxy)**: set `embedding.local_files_only: true` in `config.yaml` and point `embedding.model` to a local folder. You can also set `embedding.cache_dir` to a path where you manually place the model files.
+- **llama-server.exe missing**: the launch script will warn and continue; start `scripts\start_model.bat` after you download `llama-server.exe` and place it in `scripts\`.
 
 ## Current limitations
 - Ingestion supports `.txt` and `.md` only. PDF/HTML require adding a parser.
