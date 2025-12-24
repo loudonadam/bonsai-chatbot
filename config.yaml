@@ -1,0 +1,22 @@
+model:
+  path: "models/Meta-Llama-3-8B-Instruct.Q4_K_M.gguf"  # Path to your GGUF model file
+  server_binary: "scripts/llama-server.exe"  # Path to llama.cpp's llama-server.exe (optional helper)
+  api_base: "http://127.0.0.1:8080/v1"  # llama.cpp server URL (OpenAI-compatible)
+  max_tokens: 512
+  temperature: 0.7
+server:
+  host: "0.0.0.0"
+  port: 8000
+ui:
+  host: "127.0.0.1"
+  port: 3000
+embedding:
+  model: "BAAI/bge-small-en-v1.5"
+  device: "cpu"  # set to "cuda", "dml", or similar if you install GPU-capable torch/onnxruntime
+retrieval:
+  k: 4
+  chunk_size: 800
+  chunk_overlap: 120
+data:
+  raw_dir: "data/raw"
+  index_dir: "data/index"
