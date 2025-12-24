@@ -9,12 +9,26 @@ param(
   [switch]$NoBrowser
 )
 
+$ErrorActionPreference = "Stop"
+
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path $scriptDir -Parent
 Set-Location $repoRoot
 
 Write-Host "[INFO] Bonsai Chatbot quick launch (single PowerShell window)" -ForegroundColor Cyan
 Write-Host "[INFO] Repo root: $repoRoot"
+
+$logsDir = Join-Path $repoRoot "logs"
+New-Item -ItemType Directory -Force -Path $logsDir | Out-Null
+
+trap {
+  Write-Host "[ERROR] $($_.Exception.Message)" -ForegroundColor Red
+  if (Test-Path $logsDir) {
+    Write-Host "[INFO] Check logs in $logsDir (if any were written)" -ForegroundColor Yellow
+  }
+  Read-Host "Press Enter to exit"
+  exit 1
+}
 
 $pythonCmd = "python"
 $venvPython = Join-Path $repoRoot ".venv\\Scripts\\python.exe"
@@ -27,12 +41,10 @@ if (Test-Path $venvPython) {
 
 if ((-not (Test-Path $venvPython)) -and (-not (Get-Command python -ErrorAction SilentlyContinue))) {
   Write-Error "Python not found on PATH. Install Python 3.11+ and reopen this window."
-  exit 1
 }
 
 if (-not (Test-Path $ConfigFile)) {
   Write-Error "$ConfigFile not found in $repoRoot. Copy config.example.yaml to config.yaml and edit paths."
-  exit 1
 }
 
 if (-not (Test-Path "app/requirements.txt")) {
@@ -51,9 +63,6 @@ foreach ($folder in @("data/raw", "data/index")) {
   }
 }
 
-$logsDir = Join-Path $repoRoot "logs"
-New-Item -ItemType Directory -Force -Path $logsDir | Out-Null
-
 $function:Assert-PortAvailable = {
   param(
     [int]$Port,
@@ -64,7 +73,7 @@ $function:Assert-PortAvailable = {
     $listener = [System.Net.Sockets.TcpListener]::Create($Port)
     $listener.Start()
   } catch {
-    Write-Error "$Name port $Port is already in use. Close the existing process or rerun with a different port (ApiPort/UiPort)." -ErrorAction Stop
+    throw "$Name port $Port is already in use. Close the existing process or rerun with a different port (ApiPort/UiPort)."
   } finally {
     if ($listener) {
       $listener.Stop()
