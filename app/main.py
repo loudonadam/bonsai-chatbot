@@ -96,8 +96,17 @@ def get_app(config_path: pathlib.Path = pathlib.Path("config.yaml")) -> FastAPI:
                 resp.raise_for_status()
                 data = resp.json()
                 content: Optional[str] = data.get("choices", [{}])[0].get("message", {}).get("content")
+        except httpx.ConnectError as exc:  # pragma: no cover - runtime errors reported to user
+            hint = (
+                f"Failed to reach LLM server at {api_base}. "
+                "Make sure llama.cpp is running (e.g., scripts/start_model.bat) "
+                "and that config.model.api_base matches the server URL."
+            )
+            raise HTTPException(status_code=502, detail=hint) from exc
+        except httpx.HTTPStatusError as exc:  # pragma: no cover - runtime errors reported to user
+            raise HTTPException(status_code=exc.response.status_code, detail=f"Model call failed: {exc}") from exc
         except Exception as exc:  # pragma: no cover - runtime errors reported to user
-            raise HTTPException(status_code=500, detail=f"Model call failed: {exc}")
+            raise HTTPException(status_code=500, detail=f"Model call failed: {exc}") from exc
 
         if not content:
             raise HTTPException(status_code=500, detail="Empty response from model")
