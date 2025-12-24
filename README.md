@@ -78,10 +78,29 @@ A minimal, self-hosted RAG chatbot tailored for bonsai notes. Runs locally on Wi
      ```powershell
      cmd.exe /c scripts\launch.bat
      ```
-   - Common troubleshooting tips in PowerShell:
-     - Ensure `config.yaml` exists in the repo root.
-     - Ensure `PYTHONPATH` is set for the session (`set PYTHONPATH=$PWD`) if you see `ModuleNotFoundError: No module named 'app'`.
-     - Leave each window open to read any traceback or missing-file warnings.
+   - **Prefer one-window launch?** Use the PowerShell helper below to start everything in the current shell (logs go to `logs\`).
+
+### One-window launch helper (PowerShell)
+- Ensure dependencies are installed (virtual env activated if you use one).
+- From the repo root (or just double-click in `scripts\`), run:
+  ```powershell
+  PowerShell -ExecutionPolicy Bypass -File scripts\quick_launch.ps1
+  ```
+- The script will:
+  - Check for `config.yaml` and `python` on PATH.
+  - Create `data/raw` and `data/index` if missing.
+  - Launch the API, UI server, and (if available) `llama-server.exe` **without opening extra PowerShell windows**.
+  - Drop logs to `logs/api.log`, `logs/ui.log`, and `logs/llama-server.log`.
+  - Open your browser to `http://localhost:3000` by default.
+- Press Enter in the same window to cleanly stop all launched processes.
+- Switches:
+  - `-SkipModel` to avoid starting `llama-server.exe`.
+  - `-NoBrowser` to skip auto-opening the UI tab.
+
+### Common troubleshooting tips (PowerShell)
+- Ensure `config.yaml` exists in the repo root.
+- Ensure `PYTHONPATH` is set for the session (`set PYTHONPATH=$PWD`) if you see `ModuleNotFoundError: No module named 'app'`.
+- Leave each window open to read any traceback or missing-file warnings.
 
 ## Commands (manual, if you prefer)
 - Rebuild index:
