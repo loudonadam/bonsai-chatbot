@@ -54,6 +54,24 @@ foreach ($folder in @("data/raw", "data/index")) {
 $logsDir = Join-Path $repoRoot "logs"
 New-Item -ItemType Directory -Force -Path $logsDir | Out-Null
 
+$function:Assert-PortAvailable = {
+  param(
+    [int]$Port,
+    [string]$Name
+  )
+  $listener = $null
+  try {
+    $listener = [System.Net.Sockets.TcpListener]::Create($Port)
+    $listener.Start()
+  } catch {
+    Write-Error "$Name port $Port is already in use. Close the existing process or rerun with a different port (ApiPort/UiPort)." -ErrorAction Stop
+  } finally {
+    if ($listener) {
+      $listener.Stop()
+    }
+  }
+}
+
 $processes = @()
 function Start-LoggedProcess {
   param(
@@ -80,6 +98,7 @@ function Start-LoggedProcess {
 
 if (-not $SkipModel) {
   if ((Test-Path $ServerBinary) -and (Test-Path $ModelPath)) {
+    Assert-PortAvailable -Port 8080 -Name "Model (llama.cpp)"
     $llamaArgs = @("--model", $ModelPath, "--host", "127.0.0.1", "--port", "8080", "--ctx-size", "4096", "--n-gpu-layers", "35", "--embedding")
     $processes += Start-LoggedProcess -Name "llama-server" -FilePath $ServerBinary -Args $llamaArgs
   } elseif (-not (Test-Path $ServerBinary)) {
@@ -91,9 +110,11 @@ if (-not $SkipModel) {
   Write-Host "[INFO] SkipModel set; not launching llama-server."
 }
 
+Assert-PortAvailable -Port $ApiPort -Name "API"
 $apiArgs = @("-m", "uvicorn", "app.main:app", "--host", $ApiHost, "--port", $ApiPort)
 $processes += Start-LoggedProcess -Name "api" -FilePath $pythonCmd -ArgumentList $apiArgs
 
+Assert-PortAvailable -Port $UiPort -Name "UI"
 $uiArgs = @("-m", "http.server", "$UiPort", "-d", "ui")
 $processes += Start-LoggedProcess -Name "ui" -FilePath $pythonCmd -ArgumentList $uiArgs
 
