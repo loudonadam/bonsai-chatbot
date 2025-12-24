@@ -64,6 +64,9 @@ A minimal, self-hosted RAG chatbot tailored for bonsai notes. Runs locally on Wi
 - `data.raw_dir`: folder containing your documents.
 - `data.index_dir`: where the Chroma index lives.
 - `embedding.model`: HuggingFace model name for embeddings (defaults to `BAAI/bge-small-en-v1.5`).
+- `embedding.cache_dir`: optional folder for caching/downloading the embedding model. Useful if you want to pre-download once.
+- `embedding.local_files_only`: set to `true` to require the embedding model to be available locally (no internet download attempts). Make sure `embedding.model` points to a local path or that the model already exists in `cache_dir`.
+- The app will create `data/raw` and `data/index` if they do not exist yet, but you still need to place your source documents under `data/raw`.
 
 ## Current limitations
 - Ingestion supports `.txt` and `.md` only. PDF/HTML require adding a parser.

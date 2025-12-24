@@ -31,13 +31,22 @@ class AppConfig:
 def get_app(config_path: pathlib.Path = pathlib.Path("config.yaml")) -> FastAPI:
     app_config = AppConfig.load(config_path)
 
+    index_dir = pathlib.Path(app_config.data["index_dir"])
+    raw_dir = pathlib.Path(app_config.data["raw_dir"])
+    index_dir.mkdir(parents=True, exist_ok=True)
+    raw_dir.mkdir(parents=True, exist_ok=True)
+
+    cache_dir = app_config.embedding.get("cache_dir")
+
     rag_config = rag.RAGConfig(
-        index_dir=pathlib.Path(app_config.data["index_dir"]),
+        index_dir=index_dir,
         embedding_model=app_config.embedding["model"],
         device=app_config.embedding.get("device", "cpu"),
         chunk_size=int(app_config.retrieval.get("chunk_size", 800)),
         chunk_overlap=int(app_config.retrieval.get("chunk_overlap", 120)),
         top_k=int(app_config.retrieval.get("k", 4)),
+        cache_dir=pathlib.Path(cache_dir) if cache_dir else None,
+        local_files_only=bool(app_config.embedding.get("local_files_only", False)),
     )
 
     app = FastAPI(title="Bonsai Chatbot API", version="1.0")
@@ -63,7 +72,10 @@ def get_app(config_path: pathlib.Path = pathlib.Path("config.yaml")) -> FastAPI:
 
     @app.post("/ask", response_model=AskResponse)
     async def ask(payload: AskRequest):
-        hits = rag.retrieve(payload.question, config=rag_config)
+        try:
+            hits = rag.retrieve(payload.question, config=rag_config)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
         prompt = rag.build_prompt(payload.question, hits)
 
         api_base = app_config.model.get("api_base", "http://127.0.0.1:8080/v1")

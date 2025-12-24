@@ -28,7 +28,10 @@ def run_ingest(config_path: pathlib.Path) -> int:
     app_config = AppConfig.load(config_path)
     raw_dir = pathlib.Path(app_config.data["raw_dir"])
     index_dir = pathlib.Path(app_config.data["index_dir"])
+    raw_dir.mkdir(parents=True, exist_ok=True)
     index_dir.mkdir(parents=True, exist_ok=True)
+
+    cache_dir = app_config.embedding.get("cache_dir")
 
     rag_config = rag.RAGConfig(
         index_dir=index_dir,
@@ -37,10 +40,9 @@ def run_ingest(config_path: pathlib.Path) -> int:
         chunk_size=int(app_config.retrieval.get("chunk_size", 800)),
         chunk_overlap=int(app_config.retrieval.get("chunk_overlap", 120)),
         top_k=int(app_config.retrieval.get("k", 4)),
+        cache_dir=pathlib.Path(cache_dir) if cache_dir else None,
+        local_files_only=bool(app_config.embedding.get("local_files_only", False)),
     )
-
-    if not raw_dir.exists():
-        raise FileNotFoundError(f"Raw data directory not found: {raw_dir}")
 
     count = rag.ingest_directory(rag_config, raw_dir)
     return count
