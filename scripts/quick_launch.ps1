@@ -76,7 +76,7 @@ try {
     }
   }
 
-  $function:Assert-PortAvailable = {
+  function Assert-PortAvailable {
     param(
       [int]$Port,
       [string]$Name
