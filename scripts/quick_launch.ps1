@@ -94,6 +94,30 @@ try {
     }
   }
 
+  function Get-AvailablePort {
+    param(
+      [int]$StartingPort,
+      [string]$Name,
+      [int]$MaxAttempts = 20
+    )
+    $port = $StartingPort
+    for ($i = 0; $i -lt $MaxAttempts; $i++) {
+      $listener = $null
+      try {
+        $listener = [System.Net.Sockets.TcpListener]::Create($port)
+        $listener.Start()
+        return $port
+      } catch {
+        $port++
+      } finally {
+        if ($listener) {
+          $listener.Stop()
+        }
+      }
+    }
+    throw "No open port found for $Name starting at $StartingPort (tried $MaxAttempts ports)."
+  }
+
   $processes = @()
   function Start-LoggedProcess {
     param(
@@ -137,13 +161,16 @@ try {
   $apiArgs = @("-m", "uvicorn", "app.main:app", "--host", $ApiHost, "--port", $ApiPort)
   $processes += Start-LoggedProcess -Name "api" -FilePath $pythonCmd -ArgumentList $apiArgs
 
-  Assert-PortAvailable -Port $UiPort -Name "UI"
-  $uiArgs = @("-m", "http.server", "$UiPort", "-d", "ui")
+  $uiPortToUse = Get-AvailablePort -StartingPort $UiPort -Name "UI"
+  if ($uiPortToUse -ne $UiPort) {
+    Write-Host "[INFO] UI port $UiPort is busy. Using $uiPortToUse instead." -ForegroundColor Yellow
+  }
+  $uiArgs = @("-m", "http.server", "$uiPortToUse", "-d", "ui")
   $processes += Start-LoggedProcess -Name "ui" -FilePath $pythonCmd -ArgumentList $uiArgs
 
   if (-not $NoBrowser) {
-    Write-Host "[INFO] Opening browser to http://localhost:$UiPort"
-    Start-Process "http://localhost:$UiPort" | Out-Null
+    Write-Host "[INFO] Opening browser to http://localhost:$uiPortToUse"
+    Start-Process "http://localhost:$uiPortToUse" | Out-Null
   }
 
   Write-Host "" 
