@@ -3,7 +3,7 @@ param(
   [string]$ModelPath = "models\\bonsai-gguf.gguf",
   [string]$ServerBinary = "scripts\\llama-server.exe",
   [string]$ApiHost = "0.0.0.0",
-  [int]$ApiPort = 8000,
+  [int]$ApiPort = 8010,
   [int]$UiPort = 3000,
   [switch]$SkipModel,
   [switch]$NoBrowser
