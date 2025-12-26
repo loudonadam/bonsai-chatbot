@@ -9,7 +9,7 @@ set CONFIG_FILE=config.yaml
 set MODEL_PATH=models\bonsai-gguf.gguf
 set SERVER_BIN=scripts\llama-server.exe
 set API_HOST=0.0.0.0
-set API_PORT=8000
+set API_PORT=8010
 set UI_PORT=3000
 REM ------------------------------------------------------------------------
 

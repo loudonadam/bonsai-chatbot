@@ -63,7 +63,7 @@ A minimal, self-hosted RAG chatbot tailored for bonsai notes. Runs locally on Wi
    - Open **PowerShell** at the repo root and activate your venv (if using one).
    - Start the API (keep this window open to see logs/errors):  
      ```powershell
-     python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+     python -m uvicorn app.main:app --host 0.0.0.0 --port 8010
      ```
    - In a **second** PowerShell window at the repo root (venv active), serve the UI:  
      ```powershell
@@ -110,7 +110,7 @@ A minimal, self-hosted RAG chatbot tailored for bonsai notes. Runs locally on Wi
   ```
 - Start API:
   ```powershell
-  uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+  uvicorn app.main:app --host 0.0.0.0 --port 8010 --reload
   ```
 - Open UI: open `ui/index.html` or serve it via `python -m http.server 3000 -d ui`.
 
