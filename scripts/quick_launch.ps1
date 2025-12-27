@@ -143,14 +143,24 @@ try {
     $proc | Add-Member -NotePropertyName StderrLog -NotePropertyValue $stderrLog -Force
 
     Start-Sleep -Milliseconds 500
+    # ensure exit code is populated if the process already died
+    Wait-Process -Id $proc.Id -Timeout 1 -ErrorAction SilentlyContinue | Out-Null
+
     if ($proc.HasExited) {
       $lastError = ""
       if (Test-Path $stderrLog) {
         $lastError = (Get-Content -Path $stderrLog -Tail 20 -ErrorAction SilentlyContinue) -join "`n"
       }
-      $message = "$Name exited immediately with code $($proc.ExitCode). Check $stderrLog."
+      $exitCode = $proc.ExitCode
+      if ($null -eq $exitCode -or "$exitCode" -eq "") {
+        $exitCode = "unknown"
+      }
+      $message = "$Name exited immediately with code $exitCode. Check $stderrLog."
       if ($lastError) {
         $message += "`nLast stderr lines:`n$lastError"
+      } elseif (-not (Test-Path $stderrLog) -or (Get-Item $stderrLog).Length -eq 0) {
+        $message += "`nNo stderr output was captured. Confirm the binary exists, the model path is correct, and try running the command manually:"
+        $message += "`n`n  $FilePath $($ArgumentList -join ' ')"
       }
       throw $message
     }
