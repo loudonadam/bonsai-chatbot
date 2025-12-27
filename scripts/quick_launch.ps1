@@ -123,7 +123,7 @@ try {
     param(
       [string]$Name,
       [string]$FilePath,
-      [string[]]$ArgumentList = @()
+      [Alias("Args")][string[]]$ArgumentList = @()
     )
     if (-not (Test-Path $FilePath)) {
       throw "$Name cannot start because file not found: $FilePath"
