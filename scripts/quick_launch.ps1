@@ -137,6 +137,7 @@ try {
       RedirectStandardOutput = $stdoutLog
       RedirectStandardError  = $stderrLog
       ErrorAction            = "Stop"
+      WorkingDirectory       = $repoRoot
     }
     if ($ArgumentList -and ($ArgumentList.Count -gt 0)) {
       $startParams.ArgumentList = $ArgumentList
@@ -180,6 +181,14 @@ try {
       if (-not (Test-Path $stderrLog) -or ((Get-Item $stderrLog).Length -eq 0 -and -not $lastError)) {
         $message += "`nNo stderr output was captured. Confirm the binary exists, the model path is correct, and try running the command manually from the repo root:"
         $message += "`n`n  $cmdLine"
+
+        # Synchronous retry to surface Windows loader errors (e.g., missing DLLs/blocked binary)
+        Write-Host "[RETRY] $Name exited too quickly with no log output. Running synchronously to capture console errors..." -ForegroundColor Yellow
+        try {
+          & $FilePath @ArgumentList *>&1 | Tee-Object -FilePath $stderrLog -Append
+        } catch {
+          $message += "`nRetry failed to execute: $($_.Exception.Message)"
+        }
       }
       throw $message
     }
