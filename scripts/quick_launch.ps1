@@ -139,6 +139,22 @@ try {
       $startParams.ArgumentList = $ArgumentList
     }
     $proc = Start-Process @startParams
+    $proc | Add-Member -NotePropertyName StdoutLog -NotePropertyValue $stdoutLog -Force
+    $proc | Add-Member -NotePropertyName StderrLog -NotePropertyValue $stderrLog -Force
+
+    Start-Sleep -Milliseconds 500
+    if ($proc.HasExited) {
+      $lastError = ""
+      if (Test-Path $stderrLog) {
+        $lastError = (Get-Content -Path $stderrLog -Tail 20 -ErrorAction SilentlyContinue) -join "`n"
+      }
+      $message = "$Name exited immediately with code $($proc.ExitCode). Check $stderrLog."
+      if ($lastError) {
+        $message += "`nLast stderr lines:`n$lastError"
+      }
+      throw $message
+    }
+
     Write-Host "[STARTED] $Name -> $stdoutLog / $stderrLog"
     return $proc
   }

@@ -4,18 +4,47 @@ setlocal
 REM Update the model path to your GGUF file
 set MODEL_PATH=models\bonsai-gguf.gguf
 set SERVER_BIN=scripts\llama-server.exe
+set LOGS_DIR=%~dp0..\logs
+set STDOUT_LOG=%LOGS_DIR%\llama-server-stdout.log
+set STDERR_LOG=%LOGS_DIR%\llama-server-stderr.log
+
+if not exist "%LOGS_DIR%" (
+  mkdir "%LOGS_DIR%" >nul 2>nul
+)
 
 if not exist "%SERVER_BIN%" (
   echo llama-server.exe not found at %SERVER_BIN%
   echo Download the Windows release of llama.cpp and place llama-server.exe here.
+  pause
   exit /b 1
 )
 
 if not exist "%MODEL_PATH%" (
   echo Model file not found at %MODEL_PATH%
+  pause
   exit /b 1
 )
 
-"%SERVER_BIN%" --model "%MODEL_PATH%" --host 127.0.0.1 --port 8080 --ctx-size 4096 --n-gpu-layers 35 --embedding
+REM Check that port 8080 is free before launching.
+for /f "tokens=5" %%p in ('netstat -ano ^| findstr /r ":8080[ ]" ^| findstr LISTENING') do (
+  echo Port 8080 is already in use by PID %%p. Close the process or update scripts\start_model.bat to use a different port.
+  pause
+  exit /b 1
+)
+
+echo Writing llama.cpp logs to:
+echo   %STDOUT_LOG%
+echo   %STDERR_LOG%
+echo.
+
+"%SERVER_BIN%" --model "%MODEL_PATH%" --host 127.0.0.1 --port 8080 --ctx-size 4096 --n-gpu-layers 35 --embedding 1>>"%STDOUT_LOG%" 2>>"%STDERR_LOG%"
+
+if %errorlevel% neq 0 (
+  echo llama-server exited with error level %errorlevel%. Review the log files above for details.
+  pause
+  exit /b %errorlevel%
+)
+
+pause
 
 endlocal
