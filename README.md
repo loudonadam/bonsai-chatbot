@@ -16,22 +16,22 @@ A minimal, self-hosted RAG chatbot tailored for bonsai notes. Runs locally on Wi
   - Download `llama.cpp` Windows binaries: <https://github.com/ggerganov/llama.cpp/releases>
   - Download a model (example): <https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF>
 
-## Quick start (Windows, recommended: single PowerShell window)
-> These steps assume fresh Windows 11. Use PowerShell for setup. The quick launch script keeps its window open, checks ports, and writes logs to `logs\`.
+## Quick start (Windows, double-click friendly)
+> Goal: be able to launch, test, troubleshoot, fix, and restart by double-clicking at most two files.
 
 1) **Clone the repo**
    ```powershell
    git clone <your fork url> BonsaiChat
    cd BonsaiChat
    ```
-2) **Create and activate a virtual environment (so dependencies stay local)**
+2) **(One-time) Create and activate a virtual environment (so dependencies stay local)**
    ```powershell
    python -m venv .venv
    .\.venv\Scripts\activate
    pip install --upgrade pip
    pip install -r app/requirements.txt
    ```
-   > If you skip the venv, ensure `python` on PATH has the required packages from `app/requirements.txt`. The quick launch will auto-use `.venv\Scripts\python.exe` when it exists.
+   > If you skip the venv, ensure `python` on PATH has the required packages from `app/requirements.txt`. All launchers auto-use `.venv\Scripts\python.exe` when it exists, even when you double-click them.
 3) **Place model + llama.cpp server**
    - Download a GGUF model (example: <https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF>).
    - Put the model at `models\bonsai-gguf.gguf` **or** update `MODEL_PATH` in `scripts\launch.bat` / `scripts\start_model.bat` and `model.path` in `config.yaml` to the file you downloaded.
@@ -45,11 +45,8 @@ A minimal, self-hosted RAG chatbot tailored for bonsai notes. Runs locally on Wi
    - If you must stay offline, set `embedding.local_files_only: true` and set `embedding.model` to a local path or pre-downloaded folder. Optional: set `embedding.cache_dir` to a writable folder for cached models.
 5) **Add documents to index**
    - Put your `.txt` or `.md` sources in `data\raw`. (The scripts create this folder if missing.)
-6) **Launch everything (one window, recommended)**
-   - From the repo root in PowerShell (with your venv activated if you created one), run:
-     ```powershell
-     PowerShell -ExecutionPolicy Bypass -File scripts\quick_launch.ps1
-     ```
+6) **Launch everything (one window, double-click)**
+   - Double-click `scripts\quick_launch.bat` (or right-click > Run with PowerShell). No extra windows are opened; all logs go to `logs\`.
    - The script will:
      - Auto-use `.venv\Scripts\python.exe` when present; otherwise uses `python` on PATH.
      - Check required files (`config.yaml`, `llama-server.exe` + model if present).
@@ -58,16 +55,16 @@ A minimal, self-hosted RAG chatbot tailored for bonsai notes. Runs locally on Wi
      - Write logs to `logs\llama-server-stdout.log` / `stderr.log`, `logs\api-stdout.log` / `stderr.log`, and `logs\ui-stdout.log` / `stderr.log`.
      - Open your browser to the UI (default `http://localhost:3000`).
    - When you press Enter in that window, all processes stop cleanly.
-   - Switches: add `-SkipModel` to skip starting `llama-server.exe`, or `-NoBrowser` to avoid opening the UI tab.
-7) **Ingest documents (if you added or changed files in `data\raw`)**
-   - Keep the same PowerShell window (with venv active) and run:
-     ```powershell
-     python -m app.ingest --config config.yaml
-     ```
-   - Or run the helper (keeps the window open for errors):
-     ```powershell
-     scripts\rebuild_kb.bat
-     ```
+   - Switches (for advanced use): add `-SkipModel` to skip starting `llama-server.exe`, or `-NoBrowser` to avoid opening the UI tab.
+7) **Ingest documents (when you add/change files in `data\raw`)**
+   - Double-click `scripts\rebuild_kb.bat` (recommended). The window stays open so you can read errors.
+   - If you prefer a command (same behavior): `python -m app.ingest --config config.yaml`
+
+### Fast daily loop (minimal clicks)
+- Start everything: double-click `scripts\quick_launch.bat`.
+- Test in the browser (opens automatically). Watch `logs\*` if something fails.
+- Stop/restart: press Enter in the quick-launch window, then double-click it again.
+- Re-ingest after edits: double-click `scripts\rebuild_kb.bat`.
 
 ## Manual launch (only if you prefer separate windows)
 - **LLM server**: `scripts\start_model.bat` (writes logs to `logs\llama-server-*.log`; refuses to start if port 8080 is busy).
