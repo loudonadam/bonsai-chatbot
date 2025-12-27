@@ -16,21 +16,22 @@ A minimal, self-hosted RAG chatbot tailored for bonsai notes. Runs locally on Wi
   - Download `llama.cpp` Windows binaries: <https://github.com/ggerganov/llama.cpp/releases>
   - Download a model (example): <https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF>
 
-## Quick start (Windows, step-by-step)
-> These steps assume fresh Windows 11. Use PowerShell for the setup commands. Each helper script now leaves its window open and prints clear error messages if something fails.
+## Quick start (Windows, recommended: single PowerShell window)
+> These steps assume fresh Windows 11. Use PowerShell for setup. The quick launch script keeps its window open, checks ports, and writes logs to `logs\`.
 
 1) **Clone the repo**
    ```powershell
    git clone <your fork url> BonsaiChat
    cd BonsaiChat
    ```
-2) **Create and activate a virtual environment**
+2) **Create and activate a virtual environment (so dependencies stay local)**
    ```powershell
    python -m venv .venv
    .\.venv\Scripts\activate
    pip install --upgrade pip
    pip install -r app/requirements.txt
    ```
+   > If you skip the venv, ensure `python` on PATH has the required packages from `app/requirements.txt`. The quick launch will auto-use `.venv\Scripts\python.exe` when it exists.
 3) **Place model + llama.cpp server**
    - Download a GGUF model (example: <https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF>).
    - Put the model at `models\bonsai-gguf.gguf` **or** update `MODEL_PATH` in `scripts\launch.bat` / `scripts\start_model.bat` and `model.path` in `config.yaml` to the file you downloaded.
@@ -44,62 +45,39 @@ A minimal, self-hosted RAG chatbot tailored for bonsai notes. Runs locally on Wi
    - If you must stay offline, set `embedding.local_files_only: true` and set `embedding.model` to a local path or pre-downloaded folder. Optional: set `embedding.cache_dir` to a writable folder for cached models.
 5) **Add documents to index**
    - Put your `.txt` or `.md` sources in `data\raw`. (The scripts create this folder if missing.)
-6) **Build the index (ingestion)**
-   - Recommended (explicit PowerShell steps so you can see errors):
-     1. Open **PowerShell**.
-     2. `Set-Location C:\path\to\bonsai-chatbot` (repo root).
-     3. (If you created a venv) `.\.venv\Scripts\Activate.ps1`
-     4. Set the module path for this shell: `set PYTHONPATH=$PWD`
-     5. Run ingestion:  
-        ```powershell
-        python -m app.ingest --config config.yaml
-        ```
-   - If you prefer the helper script, you can still run it from the repo root to keep output visible:
+6) **Launch everything (one window, recommended)**
+   - From the repo root in PowerShell (with your venv activated if you created one), run:
+     ```powershell
+     PowerShell -ExecutionPolicy Bypass -File scripts\quick_launch.ps1
+     ```
+   - The script will:
+     - Auto-use `.venv\Scripts\python.exe` when present; otherwise uses `python` on PATH.
+     - Check required files (`config.yaml`, `llama-server.exe` + model if present).
+     - Preflight ports (LLM on 8080, API on 8010, UI on 3000 by default) and pick an alternate UI port if needed.
+     - Start `llama-server.exe` (if available), the FastAPI backend, and the static UI server in the same window.
+     - Write logs to `logs\llama-server-stdout.log` / `stderr.log`, `logs\api-stdout.log` / `stderr.log`, and `logs\ui-stdout.log` / `stderr.log`.
+     - Open your browser to the UI (default `http://localhost:3000`).
+   - When you press Enter in that window, all processes stop cleanly.
+   - Switches: add `-SkipModel` to skip starting `llama-server.exe`, or `-NoBrowser` to avoid opening the UI tab.
+7) **Ingest documents (if you added or changed files in `data\raw`)**
+   - Keep the same PowerShell window (with venv active) and run:
+     ```powershell
+     python -m app.ingest --config config.yaml
+     ```
+   - Or run the helper (keeps the window open for errors):
      ```powershell
      scripts\rebuild_kb.bat
      ```
-   - If anything fails, the PowerShell window will show the exact error (e.g., missing config/model, blocked download).
-7) **Launch servers and UI (manual PowerShell steps; recommended if double-click doesn’t work)**
-   - Open **PowerShell** at the repo root and activate your venv (if using one).
-   - Start the API (keep this window open to see logs/errors):  
-     ```powershell
-     python -m uvicorn app.main:app --host 0.0.0.0 --port 8010
-     ```
-   - In a **second** PowerShell window at the repo root (venv active), serve the UI:  
-     ```powershell
-     python -m http.server 3000 -d ui
-     ```
-   - (Optional) If you downloaded `llama-server.exe`, start it in a **third** PowerShell window:  
-     ```powershell
-     scripts\start_model.bat
-     ```
-   - Then open <http://localhost:3000> in your browser.
-   - If you still want the helper script, run it from an open shell so logs stay visible:  
-     ```powershell
-     cmd.exe /c scripts\launch.bat
-     ```
-   - **Prefer one-window launch?** Use the PowerShell helper below to start everything in the current shell (logs go to `logs\`).
 
-### One-window launch helper (PowerShell)
-- Ensure dependencies are installed (virtual env activated if you use one).
-- From the repo root (or just double-click in `scripts\`), run:
-  ```powershell
-  PowerShell -ExecutionPolicy Bypass -File scripts\quick_launch.ps1
-  ```
-- The script will:
-  - Check for `config.yaml` and `python` on PATH.
-  - Create `data/raw` and `data/index` if missing.
-  - Launch the API, UI server, and (if available) `llama-server.exe` **without opening extra PowerShell windows**.
-  - Drop logs to `logs/api-stdout.log` / `logs/api-stderr.log`, `logs/ui-stdout.log` / `logs/ui-stderr.log`, and `logs/llama-server-stdout.log` / `logs/llama-server-stderr.log`.
-  - Open your browser to `http://localhost:3000` by default.
-- Virtual envs: if a `.venv\Scripts\python.exe` exists in the repo root, the script will auto-use it (so right-click “Run with PowerShell” works). Otherwise it falls back to the system `python`.
-- Press Enter in the same window to cleanly stop all launched processes.
-- Switches:
-  - `-SkipModel` to avoid starting `llama-server.exe`.
-  - `-NoBrowser` to skip auto-opening the UI tab.
+## Manual launch (only if you prefer separate windows)
+- **LLM server**: `scripts\start_model.bat` (writes logs to `logs\llama-server-*.log`; refuses to start if port 8080 is busy).
+- **API**: `python -m uvicorn app.main:app --host 0.0.0.0 --port 8010`
+- **UI**: `python -m http.server 3000 -d ui`
+- Then open <http://localhost:3000>.
 
 ### Common troubleshooting tips (PowerShell)
 - Ensure `config.yaml` exists in the repo root.
+- If you use a venv, make sure the shell says `(.venv)` in the prompt before running scripts. If not, run `.\.venv\Scripts\activate`.
 - Ensure `PYTHONPATH` is set for the session (`set PYTHONPATH=$PWD`) if you see `ModuleNotFoundError: No module named 'app'`.
 - Leave each window open to read any traceback or missing-file warnings.
 
@@ -156,7 +134,7 @@ ui/
 ```
 
 ## Using the chat UI
-- After running `launch.bat` (or starting services manually), open `http://localhost:3000`.
+- After running `scripts\quick_launch.ps1` (recommended) or `launch.bat` / manual commands, open `http://localhost:3000`.
 - Ask a question; the app retrieves top chunks from your indexed docs, adds them to the prompt, and streams the model response.
 - Sources for retrieved chunks are shown under the chat output.
 
