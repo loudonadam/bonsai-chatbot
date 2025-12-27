@@ -77,6 +77,7 @@ A minimal, self-hosted RAG chatbot tailored for bonsai notes. Runs locally on Wi
 - If you use a venv, make sure the shell says `(.venv)` in the prompt before running scripts. If not, run `.\.venv\Scripts\activate`.
 - Ensure `PYTHONPATH` is set for the session (`set PYTHONPATH=$PWD`) if you see `ModuleNotFoundError: No module named 'app'`.
 - Leave each window open to read any traceback or missing-file warnings.
+- The embedding model (`BAAI/bge-small-en-v1.5`) downloads automatically on first ingest; it is not needed for `llama-server.exe` startup. If you must stay offline, set `embedding.local_files_only: true` and point `embedding.model` to a local copy.
 
 ## Commands (manual, if you prefer)
 - Rebuild index:

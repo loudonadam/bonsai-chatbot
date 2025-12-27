@@ -125,6 +125,9 @@ try {
       [string]$FilePath,
       [string[]]$ArgumentList = @()
     )
+    if (-not (Test-Path $FilePath)) {
+      throw "$Name cannot start because file not found: $FilePath"
+    }
     $stdoutLog = Join-Path $logsDir "$Name-stdout.log"
     $stderrLog = Join-Path $logsDir "$Name-stderr.log"
     $startParams = @{
@@ -138,7 +141,14 @@ try {
     if ($ArgumentList -and ($ArgumentList.Count -gt 0)) {
       $startParams.ArgumentList = $ArgumentList
     }
-    $proc = Start-Process @startParams
+    try {
+      $proc = Start-Process @startParams
+    } catch {
+      throw "$Name failed to start. Command: `"$FilePath`" $($ArgumentList -join ' ')`nError: $($_.Exception.Message)"
+    }
+    if (-not $proc -or -not $proc.Id) {
+      throw "$Name failed to start (process handle missing). Command: `"$FilePath`" $($ArgumentList -join ' ')"
+    }
     $proc | Add-Member -NotePropertyName StdoutLog -NotePropertyValue $stdoutLog -Force
     $proc | Add-Member -NotePropertyName StderrLog -NotePropertyValue $stderrLog -Force
 
@@ -151,16 +161,25 @@ try {
       if (Test-Path $stderrLog) {
         $lastError = (Get-Content -Path $stderrLog -Tail 20 -ErrorAction SilentlyContinue) -join "`n"
       }
+      $lastOut = ""
+      if (Test-Path $stdoutLog) {
+        $lastOut = (Get-Content -Path $stdoutLog -Tail 10 -ErrorAction SilentlyContinue) -join "`n"
+      }
       $exitCode = $proc.ExitCode
       if ($null -eq $exitCode -or "$exitCode" -eq "") {
         $exitCode = "unknown"
       }
+      $cmdLine = "`"$FilePath`" $($ArgumentList -join ' ')"
       $message = "$Name exited immediately with code $exitCode. Check $stderrLog."
       if ($lastError) {
         $message += "`nLast stderr lines:`n$lastError"
-      } elseif (-not (Test-Path $stderrLog) -or (Get-Item $stderrLog).Length -eq 0) {
-        $message += "`nNo stderr output was captured. Confirm the binary exists, the model path is correct, and try running the command manually:"
-        $message += "`n`n  $FilePath $($ArgumentList -join ' ')"
+      }
+      if (-not $lastError -and $lastOut) {
+        $message += "`nLast stdout lines:`n$lastOut"
+      }
+      if (-not (Test-Path $stderrLog) -or ((Get-Item $stderrLog).Length -eq 0 -and -not $lastError)) {
+        $message += "`nNo stderr output was captured. Confirm the binary exists, the model path is correct, and try running the command manually from the repo root:"
+        $message += "`n`n  $cmdLine"
       }
       throw $message
     }
