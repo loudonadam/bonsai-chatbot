@@ -78,6 +78,7 @@ A minimal, self-hosted RAG chatbot tailored for bonsai notes. Runs locally on Wi
 - Ensure `PYTHONPATH` is set for the session (`set PYTHONPATH=$PWD`) if you see `ModuleNotFoundError: No module named 'app'`.
 - Leave each window open to read any traceback or missing-file warnings.
 - The embedding model (`BAAI/bge-small-en-v1.5`) downloads automatically on first ingest; it is not needed for `llama-server.exe` startup. If you must stay offline, set `embedding.local_files_only: true` and point `embedding.model` to a local copy.
+- If `llama-server.exe` exits instantly with no logs, try: unblock the file (Right-click > Properties > Unblock), confirm you downloaded the correct Windows build (CPU/Vulkan/CUDA as needed), and install the Visual C++ runtime that the build requires.
 
 ## Commands (manual, if you prefer)
 - Rebuild index:

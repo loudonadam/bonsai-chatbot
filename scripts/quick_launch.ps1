@@ -184,11 +184,24 @@ try {
 
         # Synchronous retry to surface Windows loader errors (e.g., missing DLLs/blocked binary)
         Write-Host "[RETRY] $Name exited too quickly with no log output. Running synchronously to capture console errors..." -ForegroundColor Yellow
+        $retryExit = $null
         try {
           & $FilePath @ArgumentList *>&1 | Tee-Object -FilePath $stderrLog -Append
+          $retryExit = $LASTEXITCODE
         } catch {
           $message += "`nRetry failed to execute: $($_.Exception.Message)"
         }
+        # Append anything new we just captured
+        if (Test-Path $stderrLog) {
+          $lastError = (Get-Content -Path $stderrLog -Tail 40 -ErrorAction SilentlyContinue) -join "`n"
+        }
+        if ($retryExit -ne $null) {
+          $message += "`nRetry exit code: $retryExit"
+        }
+        if ($lastError) {
+          $message += "`nCaptured during retry:`n$lastError"
+        }
+        $message += "`nIf you still see no output, Windows may be blocking the binary (right-click > Properties > Unblock) or the VC++ runtime/GPU DLLs may be missing."
       }
       throw $message
     }
