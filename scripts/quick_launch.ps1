@@ -212,6 +212,19 @@ try {
 
   if (-not $SkipModel) {
     if ((Test-Path $ServerBinary) -and (Test-Path $ModelPath)) {
+      $serverDir = Split-Path $ServerBinary -Parent
+      $dlls = @("llama.dll", "mtmd.dll")
+      $ggmlDlls = Get-ChildItem -Path $serverDir -Filter "ggml*.dll" -ErrorAction SilentlyContinue
+      $missingDlls = @()
+      foreach ($dll in $dlls) {
+        if (-not (Test-Path (Join-Path $serverDir $dll))) {
+          $missingDlls += $dll
+        }
+      }
+      if (($missingDlls.Count -gt 0) -or (-not $ggmlDlls)) {
+        Write-Warning "llama-server.exe may be missing runtime DLLs. Ensure ggml*.dll, llama.dll, mtmd.dll from your llama.cpp build are next to $ServerBinary. (If you built llama.cpp yourself, copy everything from build\bin\Release.)"
+      }
+
       Assert-PortAvailable -Port 8080 -Name "Model (llama.cpp)"
       $llamaArgs = @("--model", $ModelPath, "--host", "127.0.0.1", "--port", "8080", "--ctx-size", "4096", "--n-gpu-layers", "35", "--embedding")
       $processes += Start-LoggedProcess -Name "llama-server" -FilePath $ServerBinary -Args $llamaArgs
