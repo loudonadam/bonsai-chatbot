@@ -80,25 +80,38 @@ function Test-LlamaBinary {
   if ($binaryDir -and (-not ($env:PATH.Split(';') -contains $binaryDir))) {
     $env:PATH = "$binaryDir;$($env:PATH)"
   }
-  try {
-    $output = & $BinaryPath --version 2>&1
-    $exitCode = $LASTEXITCODE
-  } catch {
-    $exitCode = $LASTEXITCODE
-    $output = $_.Exception.Message
+  $selectedVulkanDevice = $null
+  $attemptedAutoRetry = $false
+
+  function Invoke-VersionCheck {
+    param()
+    try {
+      $out = & $BinaryPath --version 2>&1
+      $code = $LASTEXITCODE
+    } catch {
+      $code = $LASTEXITCODE
+      $out = $_.Exception.Message
+    }
+    return [pscustomobject]@{ Output = $out; ExitCode = $code }
   }
 
-  $selectedVulkanDevice = $null
-  if ($exitCode -eq 0 -and $AutoSelectVulkan) {
-    $match = Select-VulkanDeviceFromOutput -Output $output -PreferredPattern $PreferredGpuPattern
+  $result = Invoke-VersionCheck
+
+  if ($AutoSelectVulkan -and (-not $env:GGML_VULKAN_DEVICE)) {
+    $match = Select-VulkanDeviceFromOutput -Output $result.Output -PreferredPattern $PreferredGpuPattern
     if ($match) {
       $env:GGML_VULKAN_DEVICE = "$($match.Index)"
       $selectedVulkanDevice = $match
       Write-Host "[INFO] Auto-selected Vulkan device index $($match.Index) ($($match.Name)) based on pattern '$PreferredGpuPattern'." -ForegroundColor Cyan
-    } elseif ($output -match "ggml_vulkan: Found .*Vulkan devices") {
+      $attemptedAutoRetry = $true
+      $result = Invoke-VersionCheck
+    } elseif ($result.Output -match "ggml_vulkan: Found .*Vulkan devices") {
       Write-Warning "Multiple Vulkan devices detected, but none matched '$PreferredGpuPattern'. Re-run with -VulkanDevice <index> or -VkIcdFilenames <path-to-AMD-ICD.json> to force the discrete GPU (e.g., RX 7900 XTX)."
     }
   }
+
+  $output = $result.Output
+  $exitCode = $result.ExitCode
 
   if ($exitCode -eq -1073741515 -or $exitCode -eq 3221225781) {
     throw "llama-server self-test (--version) returned $exitCode. $dllExitHint"
@@ -106,7 +119,14 @@ function Test-LlamaBinary {
   if ($exitCode -ne 0) {
     $multiDeviceHint = ""
     if ($output -match "ggml_vulkan: Found .*Vulkan devices") {
-      $multiDeviceHint = "`nHint: multiple Vulkan devices detected. Try setting -VulkanDevice <index> (0-based) or VK_ICD_FILENAMES to point at the discrete GPU ICD."
+      $multiDeviceHint = "`nHint: multiple Vulkan devices detected."
+      if ($selectedVulkanDevice) {
+        $multiDeviceHint += " Auto-selected index $($selectedVulkanDevice.Index) ($($selectedVulkanDevice.Name)) but self-test still failed."
+      }
+      if (-not $selectedVulkanDevice -and $AutoSelectVulkan) {
+        $multiDeviceHint += " Tried to match '$PreferredGpuPattern' but found none."
+      }
+      $multiDeviceHint += " Set -VulkanDevice <index> (0-based) or VK_ICD_FILENAMES to point at the discrete GPU ICD (e.g., AMD RX 7900 XTX)."
     }
     throw "llama-server self-test (--version) failed. Exit code: $exitCode. Output:`n$output`n$dllExitHint$multiDeviceHint"
   }
