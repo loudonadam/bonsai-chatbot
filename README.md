@@ -63,14 +63,17 @@ A minimal, self-hosted RAG chatbot tailored for bonsai notes. Runs locally on Wi
 ## llama.cpp setup (Windows 11 + AMD GPU, quickest path to use with quick_launch)
 These steps assume you built llama.cpp yourself (useful when you want the Vulkan build for AMD). If you already have a working `llama-server.exe`, skip to step 4.
 
-1) **Build llama.cpp (Release)**
+1) **Build llama.cpp (Release, Vulkan for AMD)**
    ```powershell
    git clone https://github.com/ggerganov/llama.cpp.git
    cd llama.cpp
-   cmake -B build -G "Visual Studio 17 2022" -A x64 -DLLAMA_CURL=OFF -DLLAMA_VULKAN=ON
+   rem Use the Vulkan option that the current llama.cpp tree recognizes. In recent versions, GGML_VULKAN is the flag.
+   cmake -B build -G "Visual Studio 17 2022" -A x64 -DLLAMA_CURL=OFF -DGGML_VULKAN=ON
+   rem If you’re on an older tree that still uses LLAMA_VULKAN, pass both:
+   rem cmake -B build -G "Visual Studio 17 2022" -A x64 -DLLAMA_CURL=OFF -DLLAMA_VULKAN=ON -DGGML_VULKAN=ON
    cmake --build build --config Release -j
    ```
-   > `-DLLAMA_CURL=OFF` avoids the curl dependency. Drop `-DLLAMA_VULKAN=ON` if you only want CPU.
+   > `-DLLAMA_CURL=OFF` avoids the curl dependency. Keep Vulkan on for AMD GPUs; drop the Vulkan flags only if you want CPU-only.
 2) **Smoke-test the binary (optional but recommended)**
    ```powershell
    .\build\bin\Release\llama-cli.exe -m C:\path\to\model.gguf -p "Hello! Summarize llama.cpp in one sentence." --gpu-layers 20
