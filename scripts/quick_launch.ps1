@@ -43,14 +43,10 @@ function FailAndPause {
   exit 1
 }
 
-function Select-VulkanDeviceFromOutput {
+function Get-VulkanDevicesFromOutput {
   param(
-    [string]$Output,
-    [string]$PreferredPattern
+    [string]$Output
   )
-  if (-not $PreferredPattern -or $PreferredPattern.Trim().Length -eq 0) {
-    return $null
-  }
   $devices = @()
   foreach ($line in ($Output -split "`r?`n")) {
     if ($line -match "ggml_vulkan:\s*(\d+):\s*(.+)$") {
@@ -60,11 +56,7 @@ function Select-VulkanDeviceFromOutput {
       }
     }
   }
-  if ($devices.Count -eq 0) {
-    return $null
-  }
-  $match = $devices | Where-Object { $_.Name -match $PreferredPattern } | Select-Object -First 1
-  return $match
+  return $devices
 }
 
 function Test-LlamaBinary {
@@ -98,7 +90,18 @@ function Test-LlamaBinary {
   $result = Invoke-VersionCheck
 
   if ($AutoSelectVulkan -and (-not $env:GGML_VULKAN_DEVICE)) {
-    $match = Select-VulkanDeviceFromOutput -Output $result.Output -PreferredPattern $PreferredGpuPattern
+    $devices = Get-VulkanDevicesFromOutput -Output $result.Output
+    $match = $null
+    if ($PreferredGpuPattern -and $PreferredGpuPattern.Trim().Length -gt 0) {
+      $match = $devices | Where-Object { $_.Name -match $PreferredGpuPattern } | Select-Object -First 1
+    }
+    if (-not $match -and $devices.Count -gt 1) {
+      # Fallback: pick the highest index (usually the discrete GPU) if no pattern matched.
+      $match = $devices | Sort-Object Index -Descending | Select-Object -First 1
+      if ($match) {
+        Write-Warning "Multiple Vulkan devices detected. No device matched pattern '$PreferredGpuPattern', so selecting index $($match.Index) ($($match.Name)) as a fallback (highest index). Use -VulkanDevice <index> to override."
+      }
+    }
     if ($match) {
       $env:GGML_VULKAN_DEVICE = "$($match.Index)"
       $selectedVulkanDevice = $match
