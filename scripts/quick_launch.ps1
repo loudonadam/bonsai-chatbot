@@ -14,6 +14,7 @@ $ErrorActionPreference = "Stop"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path $scriptDir -Parent
 Set-Location $repoRoot
+$dllExitHint = "Exit code -1073741515 (0xC0000135) usually means a missing DLL or blocked binary. Ensure ggml*.dll, llama.dll, mtmd.dll sit next to llama-server.exe, and right-click > Properties > Unblock. If you built llama.cpp yourself, copy everything from build\\bin\\Release next to the exe."
 
 Write-Host "[INFO] Bonsai Chatbot quick launch (single PowerShell window)" -ForegroundColor Cyan
 Write-Host "[INFO] Repo root: $repoRoot"
@@ -36,6 +37,29 @@ function FailAndPause {
   }
   Read-Host "Press Enter to exit" | Out-Null
   exit 1
+}
+
+function Test-LlamaBinary {
+  param(
+    [string]$BinaryPath
+  )
+  if (-not (Test-Path $BinaryPath)) {
+    throw "llama-server.exe not found at $BinaryPath"
+  }
+  $binaryDir = Split-Path $BinaryPath -Parent
+  if ($binaryDir -and (-not ($env:PATH.Split(';') -contains $binaryDir))) {
+    $env:PATH = "$binaryDir;$($env:PATH)"
+  }
+  try {
+    & $BinaryPath --version *> $null
+  } catch {
+    $exitCode = $LASTEXITCODE
+    $msg = "llama-server self-test (--version) failed. Exit code: $exitCode. $dllExitHint"
+    throw $msg
+  }
+  if ($LASTEXITCODE -eq -1073741515 -or $LASTEXITCODE -eq 3221225781) {
+    throw "llama-server self-test (--version) returned $LASTEXITCODE. $dllExitHint"
+  }
 }
 
 try {
@@ -203,6 +227,9 @@ try {
         }
         $message += "`nIf you still see no output, Windows may be blocking the binary (right-click > Properties > Unblock) or the VC++ runtime/GPU DLLs may be missing."
       }
+      if ($exitCode -eq -1073741515 -or $exitCode -eq 3221225781) {
+        $message += "`n$dllExitHint"
+      }
       throw $message
     }
 
@@ -212,6 +239,27 @@ try {
 
   if (-not $SkipModel) {
     if ((Test-Path $ServerBinary) -and (Test-Path $ModelPath)) {
+      $serverDir = Split-Path $ServerBinary -Parent
+      $dlls = @("llama.dll", "mtmd.dll")
+      $ggmlDlls = Get-ChildItem -Path $serverDir -Filter "ggml*.dll" -ErrorAction SilentlyContinue
+      $missingDlls = @()
+      foreach ($dll in $dlls) {
+        if (-not (Test-Path (Join-Path $serverDir $dll))) {
+          $missingDlls += $dll
+        }
+      }
+      if (($missingDlls.Count -gt 0) -or (-not $ggmlDlls)) {
+        Write-Warning "llama-server.exe may be missing runtime DLLs. Ensure ggml*.dll, llama.dll, mtmd.dll from your llama.cpp build are next to $ServerBinary. (If you built llama.cpp yourself, copy everything from build\bin\Release.)"
+      }
+
+      # Ensure dependent DLLs in the llama.cpp folder are on PATH for the child process.
+      if ($serverDir -and (-not ($env:PATH.Split(';') -contains $serverDir))) {
+        $env:PATH = "$serverDir;$($env:PATH)"
+      }
+
+      # Quick self-test to surface DLL issues before the logged launch.
+      Test-LlamaBinary -BinaryPath $ServerBinary
+
       Assert-PortAvailable -Port 8080 -Name "Model (llama.cpp)"
       $llamaArgs = @("--model", $ModelPath, "--host", "127.0.0.1", "--port", "8080", "--ctx-size", "4096", "--n-gpu-layers", "35", "--embedding")
       $processes += Start-LoggedProcess -Name "llama-server" -FilePath $ServerBinary -Args $llamaArgs
