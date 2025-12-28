@@ -7,6 +7,7 @@ param(
   [int]$UiPort = 3000,
   [Nullable[int]]$VulkanDevice = $null,
   [string]$VkIcdFilenames = "",
+  [string]$PreferredVulkanGpuPattern = "7900",
   [switch]$ClearVulkanDevice,
   [switch]$SkipModel,
   [switch]$NoBrowser
@@ -42,9 +43,35 @@ function FailAndPause {
   exit 1
 }
 
+function Select-VulkanDeviceFromOutput {
+  param(
+    [string]$Output,
+    [string]$PreferredPattern
+  )
+  if (-not $PreferredPattern -or $PreferredPattern.Trim().Length -eq 0) {
+    return $null
+  }
+  $devices = @()
+  foreach ($line in ($Output -split "`r?`n")) {
+    if ($line -match "ggml_vulkan:\s*(\d+):\s*(.+)$") {
+      $devices += [pscustomobject]@{
+        Index = [int]$matches[1]
+        Name  = $matches[2].Trim()
+      }
+    }
+  }
+  if ($devices.Count -eq 0) {
+    return $null
+  }
+  $match = $devices | Where-Object { $_.Name -match $PreferredPattern } | Select-Object -First 1
+  return $match
+}
+
 function Test-LlamaBinary {
   param(
-    [string]$BinaryPath
+    [string]$BinaryPath,
+    [string]$PreferredGpuPattern,
+    [switch]$AutoSelectVulkan
   )
   if (-not (Test-Path $BinaryPath)) {
     throw "llama-server.exe not found at $BinaryPath"
@@ -59,6 +86,18 @@ function Test-LlamaBinary {
   } catch {
     $exitCode = $LASTEXITCODE
     $output = $_.Exception.Message
+  }
+
+  $selectedVulkanDevice = $null
+  if ($exitCode -eq 0 -and $AutoSelectVulkan) {
+    $match = Select-VulkanDeviceFromOutput -Output $output -PreferredPattern $PreferredGpuPattern
+    if ($match) {
+      $env:GGML_VULKAN_DEVICE = "$($match.Index)"
+      $selectedVulkanDevice = $match
+      Write-Host "[INFO] Auto-selected Vulkan device index $($match.Index) ($($match.Name)) based on pattern '$PreferredGpuPattern'." -ForegroundColor Cyan
+    } elseif ($output -match "ggml_vulkan: Found .*Vulkan devices") {
+      Write-Warning "Multiple Vulkan devices detected, but none matched '$PreferredGpuPattern'. Re-run with -VulkanDevice <index> or -VkIcdFilenames <path-to-AMD-ICD.json> to force the discrete GPU (e.g., RX 7900 XTX)."
+    }
   }
 
   if ($exitCode -eq -1073741515 -or $exitCode -eq 3221225781) {
@@ -76,6 +115,12 @@ function Test-LlamaBinary {
     Write-Host "[WARN] llama-server --version produced no output (exit code 0). If it still fails to launch, double-check DLLs are beside the exe and rerun with a PowerShell prompt to see loader errors." -ForegroundColor Yellow
   } else {
     Write-Host "[CHECK] llama-server --version output:`n$output" -ForegroundColor Green
+  }
+
+  return [pscustomobject]@{
+    ExitCode          = $exitCode
+    Output            = $output
+    SelectedVulkanGpu = $selectedVulkanDevice
   }
 }
 
@@ -288,7 +333,8 @@ try {
       }
 
       # Quick self-test to surface DLL issues before the logged launch.
-      Test-LlamaBinary -BinaryPath $ServerBinary
+      $autoSelectVulkan = (-not $ClearVulkanDevice) -and ($VulkanDevice -eq $null) -and (-not $env:GGML_VULKAN_DEVICE)
+      Test-LlamaBinary -BinaryPath $ServerBinary -PreferredGpuPattern $PreferredVulkanGpuPattern -AutoSelectVulkan:$autoSelectVulkan
 
       Assert-PortAvailable -Port 8080 -Name "Model (llama.cpp)"
       $llamaArgs = @("--model", $ModelPath, "--host", "127.0.0.1", "--port", "8080", "--ctx-size", "4096", "--n-gpu-layers", "35", "--embedding")
