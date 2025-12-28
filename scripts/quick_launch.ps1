@@ -6,6 +6,7 @@ param(
   [int]$ApiPort = 8010,
   [int]$UiPort = 3000,
   [Nullable[int]]$VulkanDevice = $null,
+  [string]$VkIcdFilenames = "",
   [switch]$ClearVulkanDevice,
   [switch]$SkipModel,
   [switch]$NoBrowser
@@ -64,7 +65,11 @@ function Test-LlamaBinary {
     throw "llama-server self-test (--version) returned $exitCode. $dllExitHint"
   }
   if ($exitCode -ne 0) {
-    throw "llama-server self-test (--version) failed. Exit code: $exitCode. Output:`n$output`n$dllExitHint"
+    $multiDeviceHint = ""
+    if ($output -match "ggml_vulkan: Found .*Vulkan devices") {
+      $multiDeviceHint = "`nHint: multiple Vulkan devices detected. Try setting -VulkanDevice <index> (0-based) or VK_ICD_FILENAMES to point at the discrete GPU ICD."
+    }
+    throw "llama-server self-test (--version) failed. Exit code: $exitCode. Output:`n$output`n$dllExitHint$multiDeviceHint"
   }
 
   if (-not $output -or "$output".Trim().Length -eq 0) {
@@ -275,6 +280,11 @@ try {
       } elseif ($VulkanDevice -ne $null) {
         $env:GGML_VULKAN_DEVICE = "$VulkanDevice"
         Write-Host "[INFO] Using Vulkan device index $VulkanDevice (GGML_VULKAN_DEVICE)" -ForegroundColor Cyan
+      }
+
+      if ($VkIcdFilenames -and $VkIcdFilenames.Trim().Length -gt 0) {
+        $env:VK_ICD_FILENAMES = $VkIcdFilenames
+        Write-Host "[INFO] Using VK_ICD_FILENAMES=$VkIcdFilenames" -ForegroundColor Cyan
       }
 
       # Quick self-test to surface DLL issues before the logged launch.
