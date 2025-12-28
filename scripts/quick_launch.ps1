@@ -8,7 +8,7 @@ param(
   [Nullable[int]]$VulkanDevice = $null,
   [string]$VkIcdFilenames = "",
   [string]$PreferredVulkanGpuPattern = "7900",
-  [switch]$AutoSelectAmdVkIcd,
+  [switch]$AutoSelectAmdVkIcd = $true,
   [switch]$DisableVulkanDiagLog,
   [switch]$ClearVulkanDevice,
   [switch]$SkipModel,
@@ -79,7 +79,8 @@ function Write-VulkanDiagnostics {
     [Array]$Devices,
     [Nullable[int]]$DeviceCount,
     [string]$Output,
-    [psobject]$SelectedDevice
+    [psobject]$SelectedDevice,
+    [Array]$RegisteredDrivers
   )
   if ($DisableVulkanDiagLog) { return }
   $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
@@ -89,6 +90,15 @@ function Write-VulkanDiagnostics {
   $lines += "  GGML_VULKAN_DEVICE: $($env:GGML_VULKAN_DEVICE)"
   $lines += "  VK_ICD_FILENAMES: $($env:VK_ICD_FILENAMES)"
   $lines += "  Preferred pattern: $PreferredVulkanGpuPattern"
+  $lines += "  AutoSelectAmdVkIcd: $AutoSelectAmdVkIcd"
+  if ($RegisteredDrivers -and $RegisteredDrivers.Count -gt 0) {
+    $lines += "  Registered Vulkan drivers (registry):"
+    foreach ($drv in $RegisteredDrivers) {
+      $lines += "    - $($drv.Path)"
+    }
+  } else {
+    $lines += "  Registered Vulkan drivers (registry): none found"
+  }
   if ($SelectedDevice) {
     $lines += "  Selected device: index $($SelectedDevice.Index) name '$($SelectedDevice.Name)'"
   }
@@ -157,7 +167,8 @@ function Test-LlamaBinary {
   param(
     [string]$BinaryPath,
     [string]$PreferredGpuPattern,
-    [switch]$AutoSelectVulkan
+    [switch]$AutoSelectVulkan,
+    [Array]$RegisteredDrivers = @()
   )
   if (-not (Test-Path $BinaryPath)) {
     throw "llama-server.exe not found at $BinaryPath"
@@ -235,7 +246,7 @@ function Test-LlamaBinary {
       }
       $multiDeviceHint += " Set -VulkanDevice <index> (0-based) or VK_ICD_FILENAMES to point at the discrete GPU ICD (e.g., AMD RX 7900 XTX)."
     }
-    Write-VulkanDiagnostics -BinaryPath $BinaryPath -Devices $parsedDevices -DeviceCount $parsedDeviceCount -Output $output -SelectedDevice $selectedVulkanDevice
+    Write-VulkanDiagnostics -BinaryPath $BinaryPath -Devices $parsedDevices -DeviceCount $parsedDeviceCount -Output $output -SelectedDevice $selectedVulkanDevice -RegisteredDrivers $RegisteredDrivers
     $logNote = ""
     if (-not $DisableVulkanDiagLog) {
       $logNote = "`nDiagnostics written to $vulkanDiagLog"
@@ -460,8 +471,10 @@ try {
         $env:PATH = "$serverDir;$($env:PATH)"
       }
 
+      $registeredDrivers = @()
       if (-not $VkIcdFilenames -and $AutoSelectAmdVkIcd) {
         $icds = Get-VulkanDrivers
+        $registeredDrivers = $icds
         if ($icds -and $icds.Count -gt 1) {
           $amdIcds = $icds | Where-Object { $_.Path -match "(amd|radeon|7900)" }
           $choice = $amdIcds | Select-Object -First 1
@@ -491,7 +504,7 @@ try {
 
       # Quick self-test to surface DLL issues before the logged launch.
       $autoSelectVulkan = (-not $ClearVulkanDevice) -and ($VulkanDevice -eq $null) -and (-not $env:GGML_VULKAN_DEVICE)
-      Test-LlamaBinary -BinaryPath $ServerBinary -PreferredGpuPattern $PreferredVulkanGpuPattern -AutoSelectVulkan:$autoSelectVulkan
+      Test-LlamaBinary -BinaryPath $ServerBinary -PreferredGpuPattern $PreferredVulkanGpuPattern -AutoSelectVulkan:$autoSelectVulkan -RegisteredDrivers $registeredDrivers
 
       Assert-PortAvailable -Port 8080 -Name "Model (llama.cpp)"
       $llamaArgs = @("--model", $ModelPath, "--host", "127.0.0.1", "--port", "8080", "--ctx-size", "4096", "--n-gpu-layers", "35", "--embedding")
