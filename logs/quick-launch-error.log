@@ -1,0 +1,6 @@
+﻿2025-12-27 22:08:34	llama-server exited immediately with code unknown. Check C:\Users\loudo\Desktop\bonsai-chatbot\bonsai-chatbot\logs\llama-server-stderr.log.
+No stderr output was captured. Confirm the binary exists, the model path is correct, and try running the command manually from the repo root:
+
+  "scripts\\llama-server.exe" --model models\\bonsai-gguf.gguf --host 127.0.0.1 --port 8080 --ctx-size 4096 --n-gpu-layers 35 --embedding
+Retry exit code: -1073741515
+If you still see no output, Windows may be blocking the binary (right-click > Properties > Unblock) or the VC++ runtime/GPU DLLs may be missing.
