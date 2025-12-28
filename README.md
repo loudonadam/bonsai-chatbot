@@ -83,6 +83,7 @@ These steps assume you built llama.cpp yourself (useful when you want the Vulkan
      .\scripts\quick_launch.ps1 -ServerBinary "C:\path\to\llama-server.exe" -ModelPath "C:\path\to\your-model.gguf"
      ```
    - If you see exit code `-1073741515 (0xC0000135)`, Windows could not load a DLL: keep all `ggml*.dll`, `llama.dll`, `mtmd.dll` beside the exe, unblock the files (Right-click > Properties > Unblock), and ensure the VC++ runtime for your build is installed.
+   - Manual check (helpful if quick_launch warns): from the repo root run `.\scripts\llama-server.exe --version`. If the command prints nothing but exits 0, still verify DLLs are present/unblocked. If it exits non-zero (especially `-1073741515`), a DLL is missing/blocked.
 4) **Point the Bonsai chatbot at your model**
    - Update `config.yaml` `model.path`, or pass `-ModelPath` to `scripts\quick_launch.ps1`.
    - If you keep the model in `models\`, the default paths already work.

@@ -51,14 +51,24 @@ function Test-LlamaBinary {
     $env:PATH = "$binaryDir;$($env:PATH)"
   }
   try {
-    & $BinaryPath --version *> $null
+    $output = & $BinaryPath --version 2>&1
+    $exitCode = $LASTEXITCODE
   } catch {
     $exitCode = $LASTEXITCODE
-    $msg = "llama-server self-test (--version) failed. Exit code: $exitCode. $dllExitHint"
-    throw $msg
+    $output = $_.Exception.Message
   }
-  if ($LASTEXITCODE -eq -1073741515 -or $LASTEXITCODE -eq 3221225781) {
-    throw "llama-server self-test (--version) returned $LASTEXITCODE. $dllExitHint"
+
+  if ($exitCode -eq -1073741515 -or $exitCode -eq 3221225781) {
+    throw "llama-server self-test (--version) returned $exitCode. $dllExitHint"
+  }
+  if ($exitCode -ne 0) {
+    throw "llama-server self-test (--version) failed. Exit code: $exitCode. Output:`n$output`n$dllExitHint"
+  }
+
+  if (-not $output -or "$output".Trim().Length -eq 0) {
+    Write-Host "[WARN] llama-server --version produced no output (exit code 0). If it still fails to launch, double-check DLLs are beside the exe and rerun with a PowerShell prompt to see loader errors." -ForegroundColor Yellow
+  } else {
+    Write-Host "[CHECK] llama-server --version output:`n$output" -ForegroundColor Green
   }
 }
 
