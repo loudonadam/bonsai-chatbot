@@ -8,6 +8,7 @@ param(
   [Nullable[int]]$VulkanDevice = $null,
   [string]$VkIcdFilenames = "",
   [string]$PreferredVulkanGpuPattern = "7900",
+  [switch]$AutoSelectAmdVkIcd,
   [switch]$DisableVulkanDiagLog,
   [switch]$ClearVulkanDevice,
   [switch]$SkipModel,
@@ -128,6 +129,28 @@ function Write-VulkanDiagnostics {
   $lines += ($Output -split "`r?`n" | Select-Object -First 50)
   $lines += ""
   $lines | Out-File -FilePath $vulkanDiagLog -Encoding utf8 -Append
+}
+
+function Get-VulkanDrivers {
+  $paths = @()
+  foreach ($root in @("HKLM:\\SOFTWARE\\Khronos\\Vulkan\\Drivers", "HKCU:\\SOFTWARE\\Khronos\\Vulkan\\Drivers")) {
+    if (Test-Path $root) {
+      Get-ItemProperty -Path "$root\\*" -ErrorAction SilentlyContinue | ForEach-Object {
+        $enabled = $true
+        if ($_."(default)" -ne $null) {
+          # Khronos driver entries may store DWORD 0 to disable.
+          $enabled = ($_."(default)" -ne 0)
+        }
+        if ($enabled -and $_.PSChildName) {
+          $paths += [pscustomobject]@{
+            Path    = $_.PSChildName
+            Enabled = $enabled
+          }
+        }
+      }
+    }
+  }
+  return $paths | Sort-Object Path -Unique
 }
 
 function Test-LlamaBinary {
@@ -435,6 +458,22 @@ try {
       # Ensure dependent DLLs in the llama.cpp folder are on PATH for the child process.
       if ($serverDir -and (-not ($env:PATH.Split(';') -contains $serverDir))) {
         $env:PATH = "$serverDir;$($env:PATH)"
+      }
+
+      if (-not $VkIcdFilenames -and $AutoSelectAmdVkIcd) {
+        $icds = Get-VulkanDrivers
+        if ($icds -and $icds.Count -gt 1) {
+          $amdIcds = $icds | Where-Object { $_.Path -match "(amd|radeon|7900)" }
+          $choice = $amdIcds | Select-Object -First 1
+          if (-not $choice) {
+            # If nothing matched AMD, prefer the last entry (often the dGPU) to avoid basic/integrated ICD first.
+            $choice = $icds | Select-Object -Last 1
+          }
+          if ($choice) {
+            $env:VK_ICD_FILENAMES = $choice.Path
+            Write-Host "[INFO] Auto-selected VK_ICD_FILENAMES=$($choice.Path)" -ForegroundColor Cyan
+          }
+        }
       }
 
       if ($ClearVulkanDevice) {
