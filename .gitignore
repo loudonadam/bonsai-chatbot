@@ -6,3 +6,4 @@ models/
 data/index/
 ui/__pycache__/
 logs/quick-launch-error.log
+/logs

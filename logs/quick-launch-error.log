@@ -40,3 +40,66 @@ Hint: multiple Vulkan devices detected. Try setting -VulkanDevice <index> (0-bas
 ggml_vulkan: Found 2 Vulkan devices:
 Exit code -1073741515 (0xC0000135) usually means a missing DLL or blocked binary. Ensure ggml*.dll, llama.dll, mtmd.dll sit next to llama-server.exe, and right-click > Properties > Unblock. If you built llama.cpp yourself, copy everything from build\\bin\\Release next to the exe.
 Hint: multiple Vulkan devices detected. Try setting -VulkanDevice <index> (0-based) or VK_ICD_FILENAMES to point at the discrete GPU ICD.
+2025-12-28 11:12:35	llama-server self-test (--version) failed. Exit code: -1. Output:
+ggml_vulkan: Found 2 Vulkan devices:
+Exit code -1073741515 (0xC0000135) usually means a missing DLL or blocked binary. Ensure ggml*.dll, llama.dll, mtmd.dll sit next to llama-server.exe, and right-click > Properties > Unblock. If you built llama.cpp yourself, copy everything from build\\bin\\Release next to the exe.
+Hint: multiple Vulkan devices detected. Try setting -VulkanDevice <index> (0-based) or VK_ICD_FILENAMES to point at the discrete GPU ICD.
+2025-12-28 11:18:17	llama-server self-test (--version) failed. Exit code: -1. Output:
+ggml_vulkan: Found 2 Vulkan devices:
+Exit code -1073741515 (0xC0000135) usually means a missing DLL or blocked binary. Ensure ggml*.dll, llama.dll, mtmd.dll sit next to llama-server.exe, and right-click > Properties > Unblock. If you built llama.cpp yourself, copy everything from build\\bin\\Release next to the exe.
+Hint: multiple Vulkan devices detected. Try setting -VulkanDevice <index> (0-based) or VK_ICD_FILENAMES to point at the discrete GPU ICD.
+2025-12-28 11:23:07	llama-server self-test (--version) failed. Exit code: -1. Output:
+ggml_vulkan: Found 2 Vulkan devices:
+Exit code -1073741515 (0xC0000135) usually means a missing DLL or blocked binary. Ensure ggml*.dll, llama.dll, mtmd.dll sit next to llama-server.exe, and right-click > Properties > Unblock. If you built llama.cpp yourself, copy everything from build\\bin\\Release next to the exe.
+Hint: multiple Vulkan devices detected. Tried to match '7900' but found none. Set -VulkanDevice <index> (0-based) or VK_ICD_FILENAMES to point at the discrete GPU ICD (e.g., AMD RX 7900 XTX).
+2025-12-28 11:29:22	llama-server self-test (--version) failed. Exit code: -1. Output:
+ggml_vulkan: Found 2 Vulkan devices:
+Exit code -1073741515 (0xC0000135) usually means a missing DLL or blocked binary. Ensure ggml*.dll, llama.dll, mtmd.dll sit next to llama-server.exe, and right-click > Properties > Unblock. If you built llama.cpp yourself, copy everything from build\\bin\\Release next to the exe.
+Hint: multiple Vulkan devices detected. Tried to match '7900' but found none. Set -VulkanDevice <index> (0-based) or VK_ICD_FILENAMES to point at the discrete GPU ICD (e.g., AMD RX 7900 XTX).
+2025-12-28 11:30:49	llama-server self-test (--version) failed. Exit code: -1. Output:
+ggml_vulkan: Found 2 Vulkan devices:
+Exit code -1073741515 (0xC0000135) usually means a missing DLL or blocked binary. Ensure ggml*.dll, llama.dll, mtmd.dll sit next to llama-server.exe, and right-click > Properties > Unblock. If you built llama.cpp yourself, copy everything from build\\bin\\Release next to the exe.
+Hint: multiple Vulkan devices detected. Tried to match '7900' but found none. Set -VulkanDevice <index> (0-based) or VK_ICD_FILENAMES to point at the discrete GPU ICD (e.g., AMD RX 7900 XTX).
+2025-12-28 11:33:07	llama-server self-test (--version) failed. Exit code: -1. Output:
+ggml_vulkan: Found 2 Vulkan devices:
+Exit code -1073741515 (0xC0000135) usually means a missing DLL or blocked binary. Ensure ggml*.dll, llama.dll, mtmd.dll sit next to llama-server.exe, and right-click > Properties > Unblock. If you built llama.cpp yourself, copy everything from build\\bin\\Release next to the exe.
+Hint: multiple Vulkan devices detected. Auto-selected index 1 ((count-only, index 1)) but self-test still failed. Set -VulkanDevice <index> (0-based) or VK_ICD_FILENAMES to point at the discrete GPU ICD (e.g., AMD RX 7900 XTX).
+2025-12-28 11:39:27	llama-server self-test (--version) failed. Exit code: -1. Output:
+ggml_vulkan: Found 2 Vulkan devices:
+Exit code -1073741515 (0xC0000135) usually means a missing DLL or blocked binary. Ensure ggml*.dll, llama.dll, mtmd.dll sit next to llama-server.exe, and right-click > Properties > Unblock. If you built llama.cpp yourself, copy everything from build\\bin\\Release next to the exe.
+Hint: multiple Vulkan devices detected. Auto-selected index 1 ((count-only, index 1)) but self-test still failed. Set -VulkanDevice <index> (0-based) or VK_ICD_FILENAMES to point at the discrete GPU ICD (e.g., AMD RX 7900 XTX).
+Diagnostics written to C:\Users\loudo\Desktop\bonsai-chatbot\bonsai-chatbot\logs\quick-launch-vulkan.log
+2025-12-28 11:41:17	llama-server self-test (--version) failed. Exit code: -1. Output:
+ggml_vulkan: Found 2 Vulkan devices:
+Exit code -1073741515 (0xC0000135) usually means a missing DLL or blocked binary. Ensure ggml*.dll, llama.dll, mtmd.dll sit next to llama-server.exe, and right-click > Properties > Unblock. If you built llama.cpp yourself, copy everything from build\\bin\\Release next to the exe.
+Hint: multiple Vulkan devices detected. Auto-selected index 1 ((count-only, index 1)) but self-test still failed. Set -VulkanDevice <index> (0-based) or VK_ICD_FILENAMES to point at the discrete GPU ICD (e.g., AMD RX 7900 XTX).
+Diagnostics written to C:\Users\loudo\Desktop\bonsai-chatbot\bonsai-chatbot\logs\quick-launch-vulkan.log
+2025-12-28 11:43:41	llama-server self-test (--version) failed. Exit code: -1. Output:
+ggml_vulkan: Found 2 Vulkan devices:
+Exit code -1073741515 (0xC0000135) usually means a missing DLL or blocked binary. Ensure ggml*.dll, llama.dll, mtmd.dll sit next to llama-server.exe, and right-click > Properties > Unblock. If you built llama.cpp yourself, copy everything from build\\bin\\Release next to the exe.
+Hint: multiple Vulkan devices detected. Auto-selected index 1 ((count-only, index 1)) but self-test still failed. Set -VulkanDevice <index> (0-based) or VK_ICD_FILENAMES to point at the discrete GPU ICD (e.g., AMD RX 7900 XTX).
+Diagnostics written to C:\Users\loudo\Desktop\bonsai-chatbot\bonsai-chatbot\logs\quick-launch-vulkan.log
+2025-12-28 11:46:36	llama-server self-test (--version) failed. Exit code: -1. Output:
+ggml_vulkan: Found 2 Vulkan devices:
+Exit code -1073741515 (0xC0000135) usually means a missing DLL or blocked binary. Ensure ggml*.dll, llama.dll, mtmd.dll sit next to llama-server.exe, and right-click > Properties > Unblock. If you built llama.cpp yourself, copy everything from build\\bin\\Release next to the exe.
+Hint: multiple Vulkan devices detected. Auto-selected index 1 ((count-only, index 1)) but self-test still failed. Set -VulkanDevice <index> (0-based) or VK_ICD_FILENAMES to point at the discrete GPU ICD (e.g., AMD RX 7900 XTX).
+Diagnostics written to C:\Users\loudo\Desktop\bonsai-chatbot\bonsai-chatbot\logs\quick-launch-vulkan.log
+2025-12-28 11:49:36	No Vulkan ICDs detected in the registry. Install/repair your AMD GPU driver (Adrenalin) so an ICD JSON appears under HKLM/HKCU\SOFTWARE\Khronos\Vulkan\Drivers, or set -VkIcdFilenames to the AMD ICD path (e.g., C:\Windows\System32\amdvlk64.dll).
+2025-12-28 11:52:01	llama-server self-test (--version) failed. Exit code: -1. Output:
+ggml_vulkan: Found 2 Vulkan devices:
+Exit code -1073741515 (0xC0000135) usually means a missing DLL or blocked binary. Ensure ggml*.dll, llama.dll, mtmd.dll sit next to llama-server.exe, and right-click > Properties > Unblock. If you built llama.cpp yourself, copy everything from build\\bin\\Release next to the exe.
+Hint: multiple Vulkan devices detected. Auto-selected index 1 ((count-only, index 1)) but self-test still failed. Set -VulkanDevice <index> (0-based) or VK_ICD_FILENAMES to point at the discrete GPU ICD (e.g., AMD RX 7900 XTX).
+Diagnostics written to C:\Users\loudo\Desktop\bonsai-chatbot\bonsai-chatbot\logs\quick-launch-vulkan.log
+2025-12-28 11:56:06	llama-server self-test (--version) failed. Exit code: -1. Output:
+ggml_vulkan: Found 2 Vulkan devices:
+Exit code -1073741515 (0xC0000135) usually means a missing DLL or blocked binary. Ensure ggml*.dll, llama.dll, mtmd.dll sit next to llama-server.exe, and right-click > Properties > Unblock. If you built llama.cpp yourself, copy everything from build\\bin\\Release next to the exe.
+Hint: multiple Vulkan devices detected. Auto-selected index 1 ((count-only, index 1)) but self-test still failed. Set -VulkanDevice <index> (0-based) or VK_ICD_FILENAMES to point at the discrete GPU ICD (e.g., AMD RX 7900 XTX).
+Diagnostics written to C:\Users\loudo\Desktop\bonsai-chatbot\bonsai-chatbot\logs\quick-launch-vulkan.log
+2025-12-28 12:46:50	llama-server self-test (--version) failed. Exit code: -1. Output:
+version: 7556 (4fd59e842)
+Exit code -1073741515 (0xC0000135) usually means a missing DLL or blocked binary. Ensure ggml*.dll, llama.dll, mtmd.dll sit next to llama-server.exe, and right-click > Properties > Unblock. If you built llama.cpp yourself, copy everything from build\\bin\\Release next to the exe.
+Diagnostics written to C:\Users\loudo\Desktop\bonsai-chatbot\bonsai-chatbot\logs\quick-launch-vulkan.log
+2025-12-28 12:48:05	llama-server self-test (--version) failed. Exit code: -1. Output:
+version: 7556 (4fd59e842)
+Exit code -1073741515 (0xC0000135) usually means a missing DLL or blocked binary. Ensure ggml*.dll, llama.dll, mtmd.dll sit next to llama-server.exe, and right-click > Properties > Unblock. If you built llama.cpp yourself, copy everything from build\\bin\\Release next to the exe.
+Diagnostics written to C:\Users\loudo\Desktop\bonsai-chatbot\bonsai-chatbot\logs\quick-launch-vulkan.log

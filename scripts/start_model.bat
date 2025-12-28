@@ -50,7 +50,7 @@ echo   %STDOUT_LOG%
 echo   %STDERR_LOG%
 echo.
 
-"%SERVER_BIN%" --model "%MODEL_PATH%" --host 127.0.0.1 --port 8080 --ctx-size 4096 --n-gpu-layers 35 --embedding 1>>"%STDOUT_LOG%" 2>>"%STDERR_LOG%"
+"%SERVER_BIN%" --model "%MODEL_PATH%" --host 127.0.0.1 --port 8080 --ctx-size 4096 --n-gpu-layers -1 --embedding 1>>"%STDOUT_LOG%" 2>>"%STDERR_LOG%"
 
 if %errorlevel% neq 0 (
   echo llama-server exited with error level %errorlevel%. Review the log files above for details.
