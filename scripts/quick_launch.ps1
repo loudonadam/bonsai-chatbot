@@ -6,7 +6,8 @@ param(
   [int]$ApiPort = 8010,
   [int]$UiPort = 3000,
   [switch]$SkipModel,
-  [switch]$NoBrowser
+  [switch]$NoBrowser,
+  [switch]$DebugModel
 )
 
 $ErrorActionPreference = "Stop"
@@ -232,7 +233,18 @@ try {
 
       Assert-PortAvailable -Port 8080 -Name "Model (llama.cpp)"
       $llamaArgs = @("--model", $ModelPath, "--host", "127.0.0.1", "--port", "8080", "--ctx-size", "4096", "--n-gpu-layers", "35", "--embedding")
-      $processes += Start-LoggedProcess -Name "llama-server" -FilePath $ServerBinary -Args $llamaArgs
+      Write-Host "[INFO] llama-server binary: $ServerBinary" -ForegroundColor Cyan
+      Write-Host "[INFO] llama-server model:  $ModelPath" -ForegroundColor Cyan
+      if ($DebugModel) {
+        Write-Host "[DEBUG] Running llama-server in the foreground (press Ctrl+C to stop). PATH begins with: $serverDir" -ForegroundColor Yellow
+        & $ServerBinary @llamaArgs
+        $exit = $LASTEXITCODE
+        if ($exit -ne 0) {
+          throw "llama-server (debug) exited with code $exit. If code -1073741515, a DLL is missing (copy ggml*.dll, llama.dll, mtmd.dll next to the exe)."
+        }
+      } else {
+        $processes += Start-LoggedProcess -Name "llama-server" -FilePath $ServerBinary -Args $llamaArgs
+      }
     } elseif (-not (Test-Path $ServerBinary)) {
       Write-Warning "llama-server.exe not found at $ServerBinary; skipping model server."
     } else {

@@ -35,7 +35,7 @@ A minimal, self-hosted RAG chatbot tailored for bonsai notes. Runs locally on Wi
 3) **Place model + llama.cpp server**
    - Download a full GGUF model (example: <https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF>). Do **not** use vocab-only files; you need a full checkpoint (e.g., `...Q4_K_M.gguf`).
    - Put the model at `models\bonsai-gguf.gguf` **or** update `MODEL_PATH` in `scripts\launch.bat` / `scripts\start_model.bat`, the `-ModelPath` flag for `scripts\quick_launch.ps1`, and `model.path` in `config.yaml` to the file you downloaded.
-   - If you download prebuilt llama.cpp: place `llama-server.exe` (CPU or Vulkan build) in `scripts\` **or** point quick launch at it via `-ServerBinary "C:\path\to\llama-server.exe"`. Keep all companion DLLs next to it (at minimum `ggml*.dll`, `llama.dll`, `mtmd.dll`; if you built llama.cpp yourself, copy everything from `build\bin\Release` beside the exe). Missing DLLs often surface as exit code `-1073741515` or a silent crash.
+   - If you download prebuilt llama.cpp: place `llama-server.exe` (CPU or Vulkan build) in `scripts\` **or** point quick launch at it via `-ServerBinary "C:\path\to\llama-server.exe"`. Keep all companion DLLs next to it (at minimum `ggml*.dll`, `llama.dll`, `mtmd.dll`; if you built llama.cpp yourself, copy everything from `build\bin\Release` beside the exe). Missing DLLs often surface as exit code `-1073741515` or a silent crash. quick_launch prepends that folder to PATH automatically when launching.
 4) **Configure the app**
    ```powershell
    copy config.example.yaml config.yaml
@@ -91,6 +91,18 @@ These steps assume you built llama.cpp yourself (useful when you want the Vulkan
    ```
    - Add `-ModelPath` / `-ServerBinary` if you didn’t copy files into `models\` and `scripts\`.
    - Logs live in `logs\` (LLM, API, UI). Press Enter in the window to stop everything.
+
+### Troubleshooting llama-server startup (Windows)
+- Exit code `-1073741515` or instant exit usually means a missing DLL. Keep `llama-server.exe`, `ggml*.dll`, `llama.dll`, `mtmd.dll` in the same folder (copy all files from `build\bin\Release` if you built it yourself). quick_launch automatically adds that folder to `PATH` at launch.
+- If it still exits instantly, run quick launch with the model in the foreground to see the console error:
+  ```powershell
+  .\scripts\quick_launch.ps1 -DebugModel -ModelPath "C:\path\to\your-model.gguf" -ServerBinary "C:\path\to\llama-server.exe"
+  ```
+- Manual command from repo root (also shows missing-DLL issues):
+  ```powershell
+  "scripts\llama-server.exe" --model models\bonsai-gguf.gguf --host 127.0.0.1 --port 8080 --ctx-size 4096 --n-gpu-layers 35 --embedding
+  ```
+  Replace paths/flags as needed; if it exits with `-1073741515`, copy the missing DLLs beside the exe or unblock the files (Right-click > Properties > Unblock). Ensure the Visual C++ runtime and GPU driver for your build are installed.
 
 ### Fast daily loop (minimal clicks)
 - Start everything: double-click `scripts\quick_launch.bat`.
