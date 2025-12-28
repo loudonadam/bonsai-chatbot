@@ -168,8 +168,7 @@ function Test-LlamaBinary {
     [string]$BinaryPath,
     [string]$PreferredGpuPattern,
     [switch]$AutoSelectVulkan,
-    [Array]$RegisteredDrivers = @(),
-    [switch]$RequireRegisteredDrivers
+    [Array]$RegisteredDrivers = @()
   )
   if (-not (Test-Path $BinaryPath)) {
     throw "llama-server.exe not found at $BinaryPath"
@@ -202,9 +201,6 @@ function Test-LlamaBinary {
     $parsedDeviceCount = Get-VulkanDeviceCountFromOutput -Output $result.Output
     $devices = $parsedDevices
     $deviceCount = $parsedDeviceCount
-    if ($RequireRegisteredDrivers -and ($RegisteredDrivers.Count -eq 0)) {
-      throw "No Vulkan ICDs detected in the registry. Install/repair your AMD GPU driver (Adrenalin) so an ICD JSON appears under HKLM/HKCU\SOFTWARE\Khronos\Vulkan\Drivers, or set -VkIcdFilenames to the AMD ICD path (e.g., C:\Windows\System32\amdvlk64.dll)."
-    }
     $match = $null
     if ($PreferredGpuPattern -and $PreferredGpuPattern.Trim().Length -gt 0) {
       $match = $devices | Where-Object { $_.Name -match $PreferredGpuPattern } | Select-Object -First 1
@@ -480,9 +476,8 @@ try {
         $icds = Get-VulkanDrivers
         $registeredDrivers = $icds
         if (-not $icds -or $icds.Count -eq 0) {
-          throw "No Vulkan ICDs detected in the registry. Install/repair your AMD GPU driver (Adrenalin) so an ICD JSON appears under HKLM/HKCU\SOFTWARE\Khronos\Vulkan\Drivers, or set -VkIcdFilenames to the AMD ICD path (e.g., C:\Windows\System32\amdvlk64.dll)."
-        }
-        if ($icds -and $icds.Count -gt 1) {
+          Write-Warning "No Vulkan ICDs detected in the registry. If llama-server still fails, install/repair the AMD driver (Adrenalin) or pass -VkIcdFilenames to point at the AMD ICD json (e.g., C:\Windows\System32\amdvlk64.dll or Program Files\\AMD\\...\\amd_icd64.json)."
+        } elseif ($icds.Count -gt 1) {
           $amdIcds = $icds | Where-Object { $_.Path -match "(amd|radeon|7900)" }
           $choice = $amdIcds | Select-Object -First 1
           if (-not $choice) {
@@ -493,6 +488,9 @@ try {
             $env:VK_ICD_FILENAMES = $choice.Path
             Write-Host "[INFO] Auto-selected VK_ICD_FILENAMES=$($choice.Path)" -ForegroundColor Cyan
           }
+        } elseif ($icds.Count -eq 1) {
+          $env:VK_ICD_FILENAMES = $icds[0].Path
+          Write-Host "[INFO] Using sole VK_ICD_FILENAMES=$($icds[0].Path)" -ForegroundColor Cyan
         }
       }
 
@@ -511,7 +509,7 @@ try {
 
       # Quick self-test to surface DLL issues before the logged launch.
       $autoSelectVulkan = (-not $ClearVulkanDevice) -and ($VulkanDevice -eq $null) -and (-not $env:GGML_VULKAN_DEVICE)
-      Test-LlamaBinary -BinaryPath $ServerBinary -PreferredGpuPattern $PreferredVulkanGpuPattern -AutoSelectVulkan:$autoSelectVulkan -RegisteredDrivers $registeredDrivers -RequireRegisteredDrivers:$AutoSelectAmdVkIcd
+      Test-LlamaBinary -BinaryPath $ServerBinary -PreferredGpuPattern $PreferredVulkanGpuPattern -AutoSelectVulkan:$autoSelectVulkan -RegisteredDrivers $registeredDrivers
 
       Assert-PortAvailable -Port 8080 -Name "Model (llama.cpp)"
       $llamaArgs = @("--model", $ModelPath, "--host", "127.0.0.1", "--port", "8080", "--ctx-size", "4096", "--n-gpu-layers", "35", "--embedding")
