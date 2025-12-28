@@ -5,6 +5,10 @@ param(
   [string]$ApiHost = "0.0.0.0",
   [int]$ApiPort = 8010,
   [int]$UiPort = 3000,
+  [Nullable[int]]$VulkanDevice = $null,
+  [string]$VkIcdFilenames = "",
+  [switch]$ClearVulkanDevice,
+  [switch]$ShowVulkanEnv,
   [switch]$SkipModel,
   [switch]$NoBrowser
 )
@@ -15,6 +19,7 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path $scriptDir -Parent
 Set-Location $repoRoot
 $dllExitHint = "Exit code -1073741515 (0xC0000135) usually means a missing DLL or blocked binary. Ensure ggml*.dll, llama.dll, mtmd.dll sit next to llama-server.exe, and right-click > Properties > Unblock. If you built llama.cpp yourself, copy everything from build\\bin\\Release next to the exe."
+$vulkanDllHint = "Also confirm the Vulkan-specific ggml DLLs (e.g., ggml-vulkan*.dll) and your GPU vendor's Vulkan runtime/ICD DLLs are present/unblocked."
 
 Write-Host "[INFO] Bonsai Chatbot quick launch (single PowerShell window)" -ForegroundColor Cyan
 Write-Host "[INFO] Repo root: $repoRoot"
@@ -62,7 +67,11 @@ function Test-LlamaBinary {
     throw "llama-server self-test (--version) returned $exitCode. $dllExitHint"
   }
   if ($exitCode -ne 0) {
-    throw "llama-server self-test (--version) failed. Exit code: $exitCode. Output:`n$output`n$dllExitHint"
+    $multiDeviceHint = ""
+    if ($output -match "ggml_vulkan: Found .*Vulkan devices") {
+      $multiDeviceHint = "`nHint: multiple Vulkan devices detected. Try setting -VulkanDevice <index> (0-based) or VK_ICD_FILENAMES to point at the discrete GPU ICD."
+    }
+    throw "llama-server self-test (--version) failed. Exit code: $exitCode. Output:`n$output`n$dllExitHint`n$vulkanDllHint$multiDeviceHint"
   }
 
   if (-not $output -or "$output".Trim().Length -eq 0) {
@@ -265,6 +274,24 @@ try {
       # Ensure dependent DLLs in the llama.cpp folder are on PATH for the child process.
       if ($serverDir -and (-not ($env:PATH.Split(';') -contains $serverDir))) {
         $env:PATH = "$serverDir;$($env:PATH)"
+      }
+
+      if ($ClearVulkanDevice) {
+        Remove-Item Env:\GGML_VULKAN_DEVICE -ErrorAction SilentlyContinue | Out-Null
+        Write-Host "[INFO] Cleared GGML_VULKAN_DEVICE (using llama.cpp default device selection)" -ForegroundColor Yellow
+      } elseif ($VulkanDevice -ne $null) {
+        $env:GGML_VULKAN_DEVICE = "$VulkanDevice"
+        Write-Host "[INFO] Using Vulkan device index $VulkanDevice (GGML_VULKAN_DEVICE)" -ForegroundColor Cyan
+      }
+
+      if ($VkIcdFilenames -and $VkIcdFilenames.Trim().Length -gt 0) {
+        $env:VK_ICD_FILENAMES = $VkIcdFilenames
+        Write-Host "[INFO] Using VK_ICD_FILENAMES=$VkIcdFilenames" -ForegroundColor Cyan
+      }
+
+      if ($ShowVulkanEnv) {
+        Write-Host "[INFO] GGML_VULKAN_DEVICE=$($env:GGML_VULKAN_DEVICE)" -ForegroundColor Yellow
+        Write-Host "[INFO] VK_ICD_FILENAMES=$($env:VK_ICD_FILENAMES)" -ForegroundColor Yellow
       }
 
       # Quick self-test to surface DLL issues before the logged launch.
