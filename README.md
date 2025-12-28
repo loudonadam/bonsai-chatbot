@@ -80,12 +80,13 @@ These steps assume you built llama.cpp yourself (useful when you want the Vulkan
    ```
    Lower `--gpu-layers` if you hit OOM; remove it for CPU-only.
 3) **Copy the server binary where quick_launch can see it**
-   - Option A: copy `build\bin\Release\llama-server.exe` **plus all DLLs from the same folder (`ggml*.dll`, `llama.dll`, `mtmd.dll`, etc.)** into this repo’s `scripts\` folder. Missing DLLs → exit code `-1073741515`.
+   - Option A: copy **everything** from `build\bin\Release` into this repo’s `scripts\` folder: `llama-server.exe` **and all DLLs** (`ggml*.dll`, `llama.dll`, `mtmd.dll`, Vulkan-specific `ggml-vulkan*.dll`, etc.). Missing or blocked DLLs cause self-test errors like exit code `-1073741515 (0xC0000135)`, even if the log shows Vulkan devices detected.
    - Option B: leave it where it is and tell quick launch where to find it (the script also prepends that folder to `PATH` so co-located DLLs are found and self-tests `--version` to catch missing DLLs early):
      ```powershell
      .\scripts\quick_launch.ps1 -ServerBinary "C:\path\to\llama-server.exe" -ModelPath "C:\path\to\your-model.gguf"
      ```
    - If you see exit code `-1073741515 (0xC0000135)`, Windows could not load a DLL: keep all `ggml*.dll`, `llama.dll`, `mtmd.dll` beside the exe, unblock the files (Right-click > Properties > Unblock), and ensure the VC++ runtime for your build is installed.
+   - Seeing `ggml_vulkan: Found 2 Vulkan devices` is normal on systems with an iGPU + dGPU. If the self-test still fails, it’s almost always missing/blocked DLLs. To force the discrete GPU when two devices are present, set an env var before launching (supported on recent llama.cpp builds): `set GGML_VULKAN_DEVICE=1` (0-based index), or restrict ICDs via `VK_ICD_FILENAMES` so only the desired GPU is visible.
    - Manual check (helpful if quick_launch warns): from the repo root run `.\scripts\llama-server.exe --version`. If the command prints nothing but exits 0, still verify DLLs are present/unblocked. If it exits non-zero (especially `-1073741515`), a DLL is missing/blocked.
 4) **Point the Bonsai chatbot at your model**
    - Update `config.yaml` `model.path`, or pass `-ModelPath` to `scripts\quick_launch.ps1`.
