@@ -59,6 +59,17 @@ function Get-VulkanDevicesFromOutput {
   return $devices
 }
 
+function Get-VulkanDeviceCountFromOutput {
+  param(
+    [string]$Output
+  )
+  $count = $null
+  if ($Output -match "ggml_vulkan:\s*Found\s+(\d+)\s+Vulkan devices") {
+    $count = [int]$matches[1]
+  }
+  return $count
+}
+
 function Test-LlamaBinary {
   param(
     [string]$BinaryPath,
@@ -91,6 +102,7 @@ function Test-LlamaBinary {
 
   if ($AutoSelectVulkan -and (-not $env:GGML_VULKAN_DEVICE)) {
     $devices = Get-VulkanDevicesFromOutput -Output $result.Output
+    $deviceCount = Get-VulkanDeviceCountFromOutput -Output $result.Output
     $match = $null
     if ($PreferredGpuPattern -and $PreferredGpuPattern.Trim().Length -gt 0) {
       $match = $devices | Where-Object { $_.Name -match $PreferredGpuPattern } | Select-Object -First 1
@@ -101,6 +113,11 @@ function Test-LlamaBinary {
       if ($match) {
         Write-Warning "Multiple Vulkan devices detected. No device matched pattern '$PreferredGpuPattern', so selecting index $($match.Index) ($($match.Name)) as a fallback (highest index). Use -VulkanDevice <index> to override."
       }
+    } elseif (-not $match -and $deviceCount -and $deviceCount -gt 1) {
+      # If llama.cpp printed only the count but no device names, still try the highest index.
+      $fallbackIndex = $deviceCount - 1
+      $match = [pscustomobject]@{ Index = $fallbackIndex; Name = "(count-only, index $fallbackIndex)" }
+      Write-Warning "Multiple Vulkan devices detected (count=$deviceCount), but no names were printed. Selecting index $fallbackIndex as a fallback. Use -VulkanDevice <index> or -VkIcdFilenames <path-to-AMD-ICD.json> to override explicitly."
     }
     if ($match) {
       $env:GGML_VULKAN_DEVICE = "$($match.Index)"
