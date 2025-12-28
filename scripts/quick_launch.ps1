@@ -225,6 +225,11 @@ try {
         Write-Warning "llama-server.exe may be missing runtime DLLs. Ensure ggml*.dll, llama.dll, mtmd.dll from your llama.cpp build are next to $ServerBinary. (If you built llama.cpp yourself, copy everything from build\bin\Release.)"
       }
 
+      # Ensure dependent DLLs in the llama.cpp folder are on PATH for the child process.
+      if ($serverDir -and (-not ($env:PATH.Split(';') -contains $serverDir))) {
+        $env:PATH = "$serverDir;$($env:PATH)"
+      }
+
       Assert-PortAvailable -Port 8080 -Name "Model (llama.cpp)"
       $llamaArgs = @("--model", $ModelPath, "--host", "127.0.0.1", "--port", "8080", "--ctx-size", "4096", "--n-gpu-layers", "35", "--embedding")
       $processes += Start-LoggedProcess -Name "llama-server" -FilePath $ServerBinary -Args $llamaArgs

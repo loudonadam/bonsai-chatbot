@@ -78,7 +78,7 @@ These steps assume you built llama.cpp yourself (useful when you want the Vulkan
    Lower `--gpu-layers` if you hit OOM; remove it for CPU-only.
 3) **Copy the server binary where quick_launch can see it**
    - Option A: copy `build\bin\Release\llama-server.exe` **plus all DLLs from the same folder (`ggml*.dll`, `llama.dll`, `mtmd.dll`, etc.)** into this repo’s `scripts\` folder. Missing DLLs → exit code `-1073741515`.
-   - Option B: leave it where it is and tell quick launch where to find it:
+   - Option B: leave it where it is and tell quick launch where to find it (the script also prepends that folder to `PATH` so co-located DLLs are found):
      ```powershell
      .\scripts\quick_launch.ps1 -ServerBinary "C:\path\to\llama-server.exe" -ModelPath "C:\path\to\your-model.gguf"
      ```
