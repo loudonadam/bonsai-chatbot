@@ -5,6 +5,7 @@ param(
   [string]$ApiHost = "0.0.0.0",
   [int]$ApiPort = 8010,
   [int]$UiPort = 3000,
+  [Nullable[int]]$VulkanDevice = $null,
   [switch]$SkipModel,
   [switch]$NoBrowser
 )
@@ -265,6 +266,11 @@ try {
       # Ensure dependent DLLs in the llama.cpp folder are on PATH for the child process.
       if ($serverDir -and (-not ($env:PATH.Split(';') -contains $serverDir))) {
         $env:PATH = "$serverDir;$($env:PATH)"
+      }
+
+      if ($VulkanDevice -ne $null) {
+        $env:GGML_VULKAN_DEVICE = "$VulkanDevice"
+        Write-Host "[INFO] Using Vulkan device index $VulkanDevice (GGML_VULKAN_DEVICE)" -ForegroundColor Cyan
       }
 
       # Quick self-test to surface DLL issues before the logged launch.
