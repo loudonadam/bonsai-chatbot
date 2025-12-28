@@ -5,6 +5,7 @@ No stderr output was captured. Confirm the binary exists, the model path is corr
 Retry exit code: -1073741515
 If you still see no output, Windows may be blocking the binary (right-click > Properties > Unblock) or the VC++ runtime/GPU DLLs may be missing.
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 =======
 2025-12-28 01:33:30	llama-server self-test (--version) failed. Exit code: -1. Output:
 ggml_vulkan: Found 2 Vulkan devices:
@@ -28,3 +29,14 @@ Exit code -1073741515 (0xC0000135) usually means a missing DLL or blocked binary
 2025-12-28 01:50:59	llama-server self-test (--version) failed. Exit code: -1. Output:
 ggml_vulkan: Found 2 Vulkan devices:
 Exit code -1073741515 (0xC0000135) usually means a missing DLL or blocked binary. Ensure ggml*.dll, llama.dll, mtmd.dll sit next to llama-server.exe, and right-click > Properties > Unblock. If you built llama.cpp yourself, copy everything from build\\bin\\Release next to the exe.
+=======
+2025-12-28 01:56:57	llama-server self-test (--version) failed. Exit code: -1. Output:
+ggml_vulkan: Found 2 Vulkan devices:
+Exit code -1073741515 (0xC0000135) usually means a missing DLL or blocked binary. Ensure ggml*.dll, llama.dll, mtmd.dll sit next to llama-server.exe, and right-click > Properties > Unblock. If you built llama.cpp yourself, copy everything from build\\bin\\Release next to the exe.
+Also confirm the Vulkan-specific ggml DLLs (e.g., ggml-vulkan*.dll) and your GPU vendor's Vulkan runtime/ICD DLLs are present/unblocked.
+Hint: multiple Vulkan devices detected. Try setting -VulkanDevice <index> (0-based) or VK_ICD_FILENAMES to point at the discrete GPU ICD.
+>>>>>>> Stashed changes
+2025-12-28 11:11:47	llama-server self-test (--version) failed. Exit code: -1. Output:
+ggml_vulkan: Found 2 Vulkan devices:
+Exit code -1073741515 (0xC0000135) usually means a missing DLL or blocked binary. Ensure ggml*.dll, llama.dll, mtmd.dll sit next to llama-server.exe, and right-click > Properties > Unblock. If you built llama.cpp yourself, copy everything from build\\bin\\Release next to the exe.
+Hint: multiple Vulkan devices detected. Try setting -VulkanDevice <index> (0-based) or VK_ICD_FILENAMES to point at the discrete GPU ICD.
