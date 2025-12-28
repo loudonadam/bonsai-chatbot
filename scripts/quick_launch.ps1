@@ -420,7 +420,16 @@ try {
         }
       }
       if (($missingDlls.Count -gt 0) -or (-not $ggmlDlls)) {
-        Write-Warning "llama-server.exe may be missing runtime DLLs. Ensure ggml*.dll, llama.dll, mtmd.dll from your llama.cpp build are next to $ServerBinary. (If you built llama.cpp yourself, copy everything from build\bin\Release.)"
+        $dllMsg = "Missing DLLs detected near llama-server.exe: "
+        if ($missingDlls.Count -gt 0) {
+          $dllMsg += ($missingDlls -join ", ")
+        }
+        if (-not $ggmlDlls) {
+          if ($missingDlls.Count -gt 0) { $dllMsg += "; " }
+          $dllMsg += "no ggml*.dll files found"
+        }
+        $dllMsg += ". Copy ALL files from your llama.cpp build\\bin\\Release folder next to $ServerBinary (including ggml*.dll, llama.dll, mtmd.dll, ggml-vulkan*.dll). Right-click each DLL > Properties > Unblock, then rerun."
+        throw $dllMsg
       }
 
       # Ensure dependent DLLs in the llama.cpp folder are on PATH for the child process.
