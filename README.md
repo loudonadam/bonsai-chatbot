@@ -35,7 +35,7 @@ A minimal, self-hosted RAG chatbot tailored for bonsai notes. Runs locally on Wi
 3) **Place model + llama.cpp server**
    - Download a full GGUF model (example: <https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF>). Do **not** use vocab-only files; you need a full checkpoint (e.g., `...Q4_K_M.gguf`).
    - Put the model at `models\bonsai-gguf.gguf` **or** update `MODEL_PATH` in `scripts\launch.bat` / `scripts\start_model.bat`, the `-ModelPath` flag for `scripts\quick_launch.ps1`, and `model.path` in `config.yaml` to the file you downloaded.
-   - If you download prebuilt llama.cpp: place `llama-server.exe` (CPU or Vulkan build) in `scripts\` **or** point quick launch at it via `-ServerBinary "C:\path\to\llama-server.exe"`.
+   - If you download prebuilt llama.cpp: place `llama-server.exe` (CPU or Vulkan build) in `scripts\` **or** point quick launch at it via `-ServerBinary "C:\path\to\llama-server.exe"`. Keep all companion DLLs next to it (at minimum `ggml*.dll`, `llama.dll`, `mtmd.dll`; if you built llama.cpp yourself, copy everything from `build\bin\Release` beside the exe). Missing DLLs often surface as exit code `-1073741515` or a silent crash.
 4) **Configure the app**
    ```powershell
    copy config.example.yaml config.yaml
@@ -77,11 +77,13 @@ These steps assume you built llama.cpp yourself (useful when you want the Vulkan
    ```
    Lower `--gpu-layers` if you hit OOM; remove it for CPU-only.
 3) **Copy the server binary where quick_launch can see it**
-   - Option A: copy `build\bin\Release\llama-server.exe` into this repo’s `scripts\` folder.
-   - Option B: leave it where it is and tell quick launch where to find it:
+   - Option A: copy `build\bin\Release\llama-server.exe` **plus all DLLs from the same folder (`ggml*.dll`, `llama.dll`, `mtmd.dll`, etc.)** into this repo’s `scripts\` folder. Missing DLLs → exit code `-1073741515`.
+   - Option B: leave it where it is and tell quick launch where to find it (the script also prepends that folder to `PATH` so co-located DLLs are found and self-tests `--version` to catch missing DLLs early):
      ```powershell
      .\scripts\quick_launch.ps1 -ServerBinary "C:\path\to\llama-server.exe" -ModelPath "C:\path\to\your-model.gguf"
      ```
+   - If you see exit code `-1073741515 (0xC0000135)`, Windows could not load a DLL: keep all `ggml*.dll`, `llama.dll`, `mtmd.dll` beside the exe, unblock the files (Right-click > Properties > Unblock), and ensure the VC++ runtime for your build is installed.
+   - Manual check (helpful if quick_launch warns): from the repo root run `.\scripts\llama-server.exe --version`. If the command prints nothing but exits 0, still verify DLLs are present/unblocked. If it exits non-zero (especially `-1073741515`), a DLL is missing/blocked.
 4) **Point the Bonsai chatbot at your model**
    - Update `config.yaml` `model.path`, or pass `-ModelPath` to `scripts\quick_launch.ps1`.
    - If you keep the model in `models\`, the default paths already work.
