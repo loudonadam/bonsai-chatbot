@@ -7,9 +7,19 @@ set SERVER_BIN=scripts\llama-server.exe
 set LOGS_DIR=%~dp0..\logs
 set STDOUT_LOG=%LOGS_DIR%\llama-server-stdout.log
 set STDERR_LOG=%LOGS_DIR%\llama-server-stderr.log
-rem If you have both an iGPU and dGPU and want to force the discrete GPU (0-based index), set GGML_VULKAN_DEVICE accordingly.
-rem Comment this out if you prefer the default selection made by llama.cpp.
-set GGML_VULKAN_DEVICE=1
+rem If you have both an iGPU and dGPU and want to force one, set VULKAN_DEVICE to a 0-based index (leave blank to let llama.cpp decide).
+set VULKAN_DEVICE=
+rem Optional: restrict visible Vulkan ICDs (semicolon-separated paths to .json ICD files, often under C:\Windows\System32\DriverStore\FileRepository\*\*.json).
+set VULKAN_ICD_FILENAMES=
+
+if defined VULKAN_DEVICE (
+  set GGML_VULKAN_DEVICE=%VULKAN_DEVICE%
+  echo Using GGML_VULKAN_DEVICE=%GGML_VULKAN_DEVICE%
+)
+if defined VULKAN_ICD_FILENAMES (
+  set VK_ICD_FILENAMES=%VULKAN_ICD_FILENAMES%
+  echo Using VK_ICD_FILENAMES=%VK_ICD_FILENAMES%
+)
 
 if not exist "%LOGS_DIR%" (
   mkdir "%LOGS_DIR%" >nul 2>nul
@@ -40,7 +50,7 @@ echo   %STDOUT_LOG%
 echo   %STDERR_LOG%
 echo.
 
-"%SERVER_BIN%" --model "%MODEL_PATH%" --host 127.0.0.1 --port 8080 --ctx-size 4096 --n-gpu-layers -1 --embedding 1>>"%STDOUT_LOG%" 2>>"%STDERR_LOG%"
+"%SERVER_BIN%" --model "%MODEL_PATH%" --host 127.0.0.1 --port 8080 --ctx-size 4096 --n-gpu-layers 35 --embedding 1>>"%STDOUT_LOG%" 2>>"%STDERR_LOG%"
 
 if %errorlevel% neq 0 (
   echo llama-server exited with error level %errorlevel%. Review the log files above for details.
