@@ -8,6 +8,7 @@ param(
   [Nullable[int]]$VulkanDevice = $null,
   [string]$VkIcdFilenames = "",
   [string]$PreferredVulkanGpuPattern = "7900",
+  [switch]$DisableVulkanDiagLog,
   [switch]$ClearVulkanDevice,
   [switch]$SkipModel,
   [switch]$NoBrowser
@@ -26,6 +27,7 @@ Write-Host "[INFO] Repo root: $repoRoot"
 $logsDir = Join-Path $repoRoot "logs"
 New-Item -ItemType Directory -Force -Path $logsDir | Out-Null
 $errorLog = Join-Path $logsDir "quick-launch-error.log"
+$vulkanDiagLog = Join-Path $logsDir "quick-launch-vulkan.log"
 
 function FailAndPause {
   param(
@@ -70,6 +72,59 @@ function Get-VulkanDeviceCountFromOutput {
   return $count
 }
 
+function Write-VulkanDiagnostics {
+  param(
+    [string]$BinaryPath,
+    [Array]$Devices,
+    [Nullable[int]]$DeviceCount,
+    [string]$Output,
+    [psobject]$SelectedDevice
+  )
+  if ($DisableVulkanDiagLog) { return }
+  $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+  $lines = @()
+  $lines += "[$timestamp] Vulkan diagnostics"
+  $lines += "  Binary: $BinaryPath"
+  $lines += "  GGML_VULKAN_DEVICE: $($env:GGML_VULKAN_DEVICE)"
+  $lines += "  VK_ICD_FILENAMES: $($env:VK_ICD_FILENAMES)"
+  $lines += "  Preferred pattern: $PreferredVulkanGpuPattern"
+  if ($SelectedDevice) {
+    $lines += "  Selected device: index $($SelectedDevice.Index) name '$($SelectedDevice.Name)'"
+  }
+  if ($DeviceCount -ne $null) {
+    $lines += "  Device count (from output): $DeviceCount"
+  }
+  if ($Devices -and $Devices.Count -gt 0) {
+    $lines += "  Parsed devices:"
+    foreach ($d in $Devices) {
+      $lines += "    - [$($d.Index)] $($d.Name)"
+    }
+  } else {
+    $lines += "  Parsed devices: none"
+  }
+  if (Test-Path $BinaryPath) {
+    $binDir = Split-Path $BinaryPath -Parent
+    $lines += "  Binary folder DLLs:"
+    foreach ($dll in @("llama.dll","mtmd.dll")) {
+      $lines += "    - $dll: " + ((Test-Path (Join-Path $binDir $dll)) ? "present" : "missing")
+    }
+    $ggml = Get-ChildItem -Path $binDir -Filter "ggml*.dll" -ErrorAction SilentlyContinue
+    if ($ggml) {
+      foreach ($g in $ggml) {
+        $lines += "    - $($g.Name)"
+      }
+    } else {
+      $lines += "    - ggml*.dll: none found"
+    }
+  } else {
+    $lines += "  Binary not found; skipping DLL inventory."
+  }
+  $lines += "  Self-test output (truncated to 50 lines):"
+  $lines += ($Output -split "`r?`n" | Select-Object -First 50)
+  $lines += ""
+  $lines | Out-File -FilePath $vulkanDiagLog -Encoding utf8 -Append
+}
+
 function Test-LlamaBinary {
   param(
     [string]$BinaryPath,
@@ -85,6 +140,8 @@ function Test-LlamaBinary {
   }
   $selectedVulkanDevice = $null
   $attemptedAutoRetry = $false
+  $parsedDevices = @()
+  $parsedDeviceCount = $null
 
   function Invoke-VersionCheck {
     param()
@@ -101,8 +158,10 @@ function Test-LlamaBinary {
   $result = Invoke-VersionCheck
 
   if ($AutoSelectVulkan -and (-not $env:GGML_VULKAN_DEVICE)) {
-    $devices = Get-VulkanDevicesFromOutput -Output $result.Output
-    $deviceCount = Get-VulkanDeviceCountFromOutput -Output $result.Output
+    $parsedDevices = Get-VulkanDevicesFromOutput -Output $result.Output
+    $parsedDeviceCount = Get-VulkanDeviceCountFromOutput -Output $result.Output
+    $devices = $parsedDevices
+    $deviceCount = $parsedDeviceCount
     $match = $null
     if ($PreferredGpuPattern -and $PreferredGpuPattern.Trim().Length -gt 0) {
       $match = $devices | Where-Object { $_.Name -match $PreferredGpuPattern } | Select-Object -First 1
@@ -148,7 +207,12 @@ function Test-LlamaBinary {
       }
       $multiDeviceHint += " Set -VulkanDevice <index> (0-based) or VK_ICD_FILENAMES to point at the discrete GPU ICD (e.g., AMD RX 7900 XTX)."
     }
-    throw "llama-server self-test (--version) failed. Exit code: $exitCode. Output:`n$output`n$dllExitHint$multiDeviceHint"
+    Write-VulkanDiagnostics -BinaryPath $BinaryPath -Devices $parsedDevices -DeviceCount $parsedDeviceCount -Output $output -SelectedDevice $selectedVulkanDevice
+    $logNote = ""
+    if (-not $DisableVulkanDiagLog) {
+      $logNote = "`nDiagnostics written to $vulkanDiagLog"
+    }
+    throw "llama-server self-test (--version) failed. Exit code: $exitCode. Output:`n$output`n$dllExitHint$multiDeviceHint$logNote"
   }
 
   if (-not $output -or "$output".Trim().Length -eq 0) {
