@@ -33,9 +33,9 @@ A minimal, self-hosted RAG chatbot tailored for bonsai notes. Runs locally on Wi
    ```
    > If you skip the venv, ensure `python` on PATH has the required packages from `app/requirements.txt`. All launchers auto-use `.venv\Scripts\python.exe` when it exists, even when you double-click them.
 3) **Place model + llama.cpp server**
-   - Download a GGUF model (example: <https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF>).
-   - Put the model at `models\bonsai-gguf.gguf` **or** update `MODEL_PATH` in `scripts\launch.bat` / `scripts\start_model.bat` and `model.path` in `config.yaml` to the file you downloaded.
-   - Download `llama-server.exe` from the llama.cpp Windows release and place it in `scripts\`.
+   - Download a full GGUF model (example: <https://huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF>). Do **not** use vocab-only files; you need a full checkpoint (e.g., `...Q4_K_M.gguf`).
+   - Put the model at `models\bonsai-gguf.gguf` **or** update `MODEL_PATH` in `scripts\launch.bat` / `scripts\start_model.bat`, the `-ModelPath` flag for `scripts\quick_launch.ps1`, and `model.path` in `config.yaml` to the file you downloaded.
+   - If you download prebuilt llama.cpp: place `llama-server.exe` (CPU or Vulkan build) in `scripts\` **or** point quick launch at it via `-ServerBinary "C:\path\to\llama-server.exe"`.
 4) **Configure the app**
    ```powershell
    copy config.example.yaml config.yaml
@@ -55,10 +55,42 @@ A minimal, self-hosted RAG chatbot tailored for bonsai notes. Runs locally on Wi
      - Write logs to `logs\llama-server-stdout.log` / `stderr.log`, `logs\api-stdout.log` / `stderr.log`, and `logs\ui-stdout.log` / `stderr.log`.
      - Open your browser to the UI (default `http://localhost:3000`).
    - When you press Enter in that window, all processes stop cleanly.
-   - Switches (for advanced use): add `-SkipModel` to skip starting `llama-server.exe`, or `-NoBrowser` to avoid opening the UI tab.
+   - Switches (for advanced use): add `-SkipModel` to skip starting `llama-server.exe`, or `-NoBrowser` to avoid opening the UI tab. You can also pass `-ModelPath` and `-ServerBinary` if your GGUF or llama.cpp build lives elsewhere.
 7) **Ingest documents (when you add/change files in `data\raw`)**
    - Double-click `scripts\rebuild_kb.bat` (recommended). The window stays open so you can read errors.
    - If you prefer a command (same behavior): `python -m app.ingest --config config.yaml`
+
+## llama.cpp setup (Windows 11 + AMD GPU, quickest path to use with quick_launch)
+These steps assume you built llama.cpp yourself (useful when you want the Vulkan build for AMD). If you already have a working `llama-server.exe`, skip to step 4.
+
+1) **Build llama.cpp (Release)**
+   ```powershell
+   git clone https://github.com/ggerganov/llama.cpp.git
+   cd llama.cpp
+   cmake -B build -G "Visual Studio 17 2022" -A x64 -DLLAMA_CURL=OFF -DLLAMA_VULKAN=ON
+   cmake --build build --config Release -j
+   ```
+   > `-DLLAMA_CURL=OFF` avoids the curl dependency. Drop `-DLLAMA_VULKAN=ON` if you only want CPU.
+2) **Smoke-test the binary (optional but recommended)**
+   ```powershell
+   .\build\bin\Release\llama-cli.exe -m C:\path\to\model.gguf -p "Hello! Summarize llama.cpp in one sentence." --gpu-layers 20
+   ```
+   Lower `--gpu-layers` if you hit OOM; remove it for CPU-only.
+3) **Copy the server binary where quick_launch can see it**
+   - Option A: copy `build\bin\Release\llama-server.exe` into this repo’s `scripts\` folder.
+   - Option B: leave it where it is and tell quick launch where to find it:
+     ```powershell
+     .\scripts\quick_launch.ps1 -ServerBinary "C:\path\to\llama-server.exe" -ModelPath "C:\path\to\your-model.gguf"
+     ```
+4) **Point the Bonsai chatbot at your model**
+   - Update `config.yaml` `model.path`, or pass `-ModelPath` to `scripts\quick_launch.ps1`.
+   - If you keep the model in `models\`, the default paths already work.
+5) **Run the bot (single window)**
+   ```powershell
+   .\scripts\quick_launch.ps1
+   ```
+   - Add `-ModelPath` / `-ServerBinary` if you didn’t copy files into `models\` and `scripts\`.
+   - Logs live in `logs\` (LLM, API, UI). Press Enter in the window to stop everything.
 
 ### Fast daily loop (minimal clicks)
 - Start everything: double-click `scripts\quick_launch.bat`.
