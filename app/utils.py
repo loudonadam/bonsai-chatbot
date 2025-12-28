@@ -13,6 +13,13 @@ def read_text_file(path: pathlib.Path) -> str:
 
 
 def chunk_text(text: str, chunk_size: int, chunk_overlap: int) -> List[str]:
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be positive")
+    if chunk_overlap < 0:
+        raise ValueError("chunk_overlap must be non-negative")
+    if chunk_overlap >= chunk_size:
+        raise ValueError("chunk_overlap must be smaller than chunk_size to avoid infinite loops")
+
     words = text.split()
     chunks: List[str] = []
     start = 0

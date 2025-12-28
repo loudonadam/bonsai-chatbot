@@ -1,5 +1,7 @@
 import asyncio
+import logging
 import pathlib
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
@@ -10,6 +12,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from app import rag
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -48,8 +52,18 @@ def get_app(config_path: pathlib.Path = pathlib.Path("config.yaml")) -> FastAPI:
         cache_dir=pathlib.Path(cache_dir) if cache_dir else None,
         local_files_only=bool(app_config.embedding.get("local_files_only", False)),
     )
+    rag_service = rag.RAGService(rag_config)
 
-    app = FastAPI(title="Bonsai Chatbot API", version="1.0")
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        rag_service.prime()
+        client_timeout = app_config.model.get("timeout_seconds", 120)
+        async with httpx.AsyncClient(timeout=client_timeout) as client:
+            app.state.http_client = client
+            yield
+        app.state.http_client = None
+
+    app = FastAPI(title="Bonsai Chatbot API", version="1.0", lifespan=lifespan)
 
     app.add_middleware(
         CORSMiddleware,
@@ -73,7 +87,9 @@ def get_app(config_path: pathlib.Path = pathlib.Path("config.yaml")) -> FastAPI:
     @app.post("/ask", response_model=AskResponse)
     async def ask(payload: AskRequest):
         try:
-            hits = rag.retrieve(payload.question, config=rag_config)
+            hits = rag_service.retrieve(payload.question)
+            if not hits:
+                logger.warning("No retrieval results for query: %s", payload.question)
         except RuntimeError as exc:
             raise HTTPException(status_code=500, detail=str(exc))
         prompt = rag.build_prompt(payload.question, hits)
@@ -91,11 +107,13 @@ def get_app(config_path: pathlib.Path = pathlib.Path("config.yaml")) -> FastAPI:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=120) as client:
-                resp = await client.post(f"{api_base}/chat/completions", json=body)
-                resp.raise_for_status()
-                data = resp.json()
-                content: Optional[str] = data.get("choices", [{}])[0].get("message", {}).get("content")
+            client: Optional[httpx.AsyncClient] = getattr(app.state, "http_client", None)
+            if client is None:
+                raise RuntimeError("HTTP client not initialized; FastAPI lifespan may not have started.")
+            resp = await client.post(f"{api_base}/chat/completions", json=body)
+            resp.raise_for_status()
+            data = resp.json()
+            content: Optional[str] = data.get("choices", [{}])[0].get("message", {}).get("content")
         except httpx.ConnectError as exc:  # pragma: no cover - runtime errors reported to user
             hint = (
                 f"Failed to reach LLM server at {api_base}. "
@@ -118,10 +136,13 @@ def get_app(config_path: pathlib.Path = pathlib.Path("config.yaml")) -> FastAPI:
 
     @app.post("/ingest", response_model=IngestResponse)
     async def ingest():
-        from app.ingest import run_ingest
-
         loop = asyncio.get_event_loop()
-        count = await loop.run_in_executor(None, run_ingest, config_path)
+        try:
+            count = await loop.run_in_executor(None, rag_service.ingest_directory, raw_dir)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        except Exception as exc:  # pragma: no cover - runtime guardrail
+            raise HTTPException(status_code=500, detail=f"Ingestion failed: {exc}")
         return IngestResponse(chunks=count)
 
     return app

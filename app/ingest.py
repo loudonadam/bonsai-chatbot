@@ -53,7 +53,11 @@ def main() -> None:
     parser.add_argument("--config", type=pathlib.Path, default=pathlib.Path("config.yaml"))
     args = parser.parse_args()
 
-    count = run_ingest(args.config)
+    try:
+        count = run_ingest(args.config)
+    except ValueError as exc:
+        parser.error(str(exc))
+        return
     print(f"Ingested {count} chunks into the index.")
 
 
