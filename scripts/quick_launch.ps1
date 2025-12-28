@@ -8,6 +8,13 @@ param(
   [Nullable[int]]$VulkanDevice = $null,
   [string]$VkIcdFilenames = "",
   [string]$PreferredVulkanGpuPattern = "7900",
+  [string[]]$AmdIcdSearchPaths = @(
+    "C:\\Windows\\System32\\amdvlk64.dll",
+    "C:\\Windows\\System32\\amd_icd64.json",
+    "C:\\Program Files\\AMD",
+    "C:\\Program Files\\AMD\\CNext",
+    "C:\\Program Files\\AMD\\CNext\\Plugins"
+  ),
   [switch]$AutoSelectAmdVkIcd = $true,
   [switch]$DisableVulkanDiagLog,
   [switch]$ClearVulkanDevice,
@@ -80,7 +87,8 @@ function Write-VulkanDiagnostics {
     [Nullable[int]]$DeviceCount,
     [string]$Output,
     [psobject]$SelectedDevice,
-    [Array]$RegisteredDrivers
+    [Array]$RegisteredDrivers,
+    [string]$AutoFoundIcd
   )
   if ($DisableVulkanDiagLog) { return }
   $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
@@ -91,6 +99,9 @@ function Write-VulkanDiagnostics {
   $lines += "  VK_ICD_FILENAMES: $($env:VK_ICD_FILENAMES)"
   $lines += "  Preferred pattern: $PreferredVulkanGpuPattern"
   $lines += "  AutoSelectAmdVkIcd: $AutoSelectAmdVkIcd"
+  if ($AutoFoundIcd) {
+    $lines += "  Auto-found AMD ICD: $AutoFoundIcd"
+  }
   if ($RegisteredDrivers -and $RegisteredDrivers.Count -gt 0) {
     $lines += "  Registered Vulkan drivers (registry):"
     foreach ($drv in $RegisteredDrivers) {
@@ -163,12 +174,35 @@ function Get-VulkanDrivers {
   return $paths | Sort-Object Path -Unique
 }
 
+function Find-AmdIcdCandidate {
+  param(
+    [string[]]$CandidatePaths
+  )
+  $names = @("amdvlk64.dll", "amd_icd64.json", "amd-vulkan64.json", "amd-vulkan64.icd")
+  foreach ($path in $CandidatePaths) {
+    if (-not $path) { continue }
+    if (Test-Path $path -PathType Leaf) {
+      return $path
+    }
+    if (Test-Path $path -PathType Container) {
+      foreach ($name in $names) {
+        $found = Get-ChildItem -Path $path -Filter $name -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($found) {
+          return $found.FullName
+        }
+      }
+    }
+  }
+  return $null
+}
+
 function Test-LlamaBinary {
   param(
     [string]$BinaryPath,
     [string]$PreferredGpuPattern,
     [switch]$AutoSelectVulkan,
-    [Array]$RegisteredDrivers = @()
+    [Array]$RegisteredDrivers = @(),
+    [string]$AutoFoundIcd = ""
   )
   if (-not (Test-Path $BinaryPath)) {
     throw "llama-server.exe not found at $BinaryPath"
@@ -246,7 +280,7 @@ function Test-LlamaBinary {
       }
       $multiDeviceHint += " Set -VulkanDevice <index> (0-based) or VK_ICD_FILENAMES to point at the discrete GPU ICD (e.g., AMD RX 7900 XTX)."
     }
-    Write-VulkanDiagnostics -BinaryPath $BinaryPath -Devices $parsedDevices -DeviceCount $parsedDeviceCount -Output $output -SelectedDevice $selectedVulkanDevice -RegisteredDrivers $RegisteredDrivers
+    Write-VulkanDiagnostics -BinaryPath $BinaryPath -Devices $parsedDevices -DeviceCount $parsedDeviceCount -Output $output -SelectedDevice $selectedVulkanDevice -RegisteredDrivers $RegisteredDrivers -AutoFoundIcd $AutoFoundIcd
     $logNote = ""
     if (-not $DisableVulkanDiagLog) {
       $logNote = "`nDiagnostics written to $vulkanDiagLog"
@@ -471,17 +505,24 @@ try {
         $env:PATH = "$serverDir;$($env:PATH)"
       }
 
-      $registeredDrivers = @()
-      if (-not $VkIcdFilenames -and $AutoSelectAmdVkIcd) {
-        $icds = Get-VulkanDrivers
-        $registeredDrivers = $icds
-        if (-not $icds -or $icds.Count -eq 0) {
-          Write-Warning "No Vulkan ICDs detected in the registry. If llama-server still fails, install/repair the AMD driver (Adrenalin) or pass -VkIcdFilenames to point at the AMD ICD json (e.g., C:\Windows\System32\amdvlk64.dll or Program Files\\AMD\\...\\amd_icd64.json)."
-        } elseif ($icds.Count -gt 1) {
-          $amdIcds = $icds | Where-Object { $_.Path -match "(amd|radeon|7900)" }
-          $choice = $amdIcds | Select-Object -First 1
-          if (-not $choice) {
-            # If nothing matched AMD, prefer the last entry (often the dGPU) to avoid basic/integrated ICD first.
+  $registeredDrivers = @()
+  $autoFoundIcd = $null
+  if (-not $VkIcdFilenames -and $AutoSelectAmdVkIcd) {
+    $icds = Get-VulkanDrivers
+    $registeredDrivers = $icds
+    if (-not $icds -or $icds.Count -eq 0) {
+      $autoFoundIcd = Find-AmdIcdCandidate -CandidatePaths $AmdIcdSearchPaths
+      if ($autoFoundIcd) {
+        $env:VK_ICD_FILENAMES = $autoFoundIcd
+        Write-Host "[INFO] Auto-found AMD ICD at $autoFoundIcd (filesystem search). Set -VkIcdFilenames to override." -ForegroundColor Cyan
+      } else {
+        Write-Warning "No Vulkan ICDs detected in the registry and none found on disk. If llama-server still fails, install/repair the AMD driver (Adrenalin) or pass -VkIcdFilenames to point at the AMD ICD json (e.g., C:\Windows\System32\amdvlk64.dll or Program Files\\AMD\\...\\amd_icd64.json)."
+      }
+    } elseif ($icds.Count -gt 1) {
+      $amdIcds = $icds | Where-Object { $_.Path -match "(amd|radeon|7900)" }
+      $choice = $amdIcds | Select-Object -First 1
+      if (-not $choice) {
+        # If nothing matched AMD, prefer the last entry (often the dGPU) to avoid basic/integrated ICD first.
             $choice = $icds | Select-Object -Last 1
           }
           if ($choice) {
@@ -509,7 +550,7 @@ try {
 
       # Quick self-test to surface DLL issues before the logged launch.
       $autoSelectVulkan = (-not $ClearVulkanDevice) -and ($VulkanDevice -eq $null) -and (-not $env:GGML_VULKAN_DEVICE)
-      Test-LlamaBinary -BinaryPath $ServerBinary -PreferredGpuPattern $PreferredVulkanGpuPattern -AutoSelectVulkan:$autoSelectVulkan -RegisteredDrivers $registeredDrivers
+      Test-LlamaBinary -BinaryPath $ServerBinary -PreferredGpuPattern $PreferredVulkanGpuPattern -AutoSelectVulkan:$autoSelectVulkan -RegisteredDrivers $registeredDrivers -AutoFoundIcd $autoFoundIcd
 
       Assert-PortAvailable -Port 8080 -Name "Model (llama.cpp)"
       $llamaArgs = @("--model", $ModelPath, "--host", "127.0.0.1", "--port", "8080", "--ctx-size", "4096", "--n-gpu-layers", "35", "--embedding")
