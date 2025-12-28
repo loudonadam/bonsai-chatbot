@@ -106,7 +106,12 @@ function Write-VulkanDiagnostics {
     $binDir = Split-Path $BinaryPath -Parent
     $lines += "  Binary folder DLLs:"
     foreach ($dll in @("llama.dll","mtmd.dll")) {
-      $lines += "    - $dll: " + ((Test-Path (Join-Path $binDir $dll)) ? "present" : "missing")
+      $isPresent = Test-Path (Join-Path $binDir $dll)
+      if ($isPresent) {
+        $lines += "    - $dll: present"
+      } else {
+        $lines += "    - $dll: missing"
+      }
     }
     $ggml = Get-ChildItem -Path $binDir -Filter "ggml*.dll" -ErrorAction SilentlyContinue
     if ($ggml) {
