@@ -7,6 +7,9 @@ set SERVER_BIN=scripts\llama-server.exe
 set LOGS_DIR=%~dp0..\logs
 set STDOUT_LOG=%LOGS_DIR%\llama-server-stdout.log
 set STDERR_LOG=%LOGS_DIR%\llama-server-stderr.log
+rem If you have both an iGPU and dGPU and want to force the discrete GPU (0-based index), set GGML_VULKAN_DEVICE accordingly.
+rem Comment this out if you prefer the default selection made by llama.cpp.
+set GGML_VULKAN_DEVICE=1
 
 if not exist "%LOGS_DIR%" (
   mkdir "%LOGS_DIR%" >nul 2>nul

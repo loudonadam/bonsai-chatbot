@@ -63,26 +63,30 @@ A minimal, self-hosted RAG chatbot tailored for bonsai notes. Runs locally on Wi
 ## llama.cpp setup (Windows 11 + AMD GPU, quickest path to use with quick_launch)
 These steps assume you built llama.cpp yourself (useful when you want the Vulkan build for AMD). If you already have a working `llama-server.exe`, skip to step 4.
 
-1) **Build llama.cpp (Release)**
+1) **Build llama.cpp (Release, Vulkan for AMD)**
    ```powershell
    git clone https://github.com/ggerganov/llama.cpp.git
    cd llama.cpp
-   cmake -B build -G "Visual Studio 17 2022" -A x64 -DLLAMA_CURL=OFF -DLLAMA_VULKAN=ON
+   rem Use the Vulkan option that the current llama.cpp tree recognizes. In recent versions, GGML_VULKAN is the flag.
+   cmake -B build -G "Visual Studio 17 2022" -A x64 -DLLAMA_CURL=OFF -DGGML_VULKAN=ON
+   rem If you’re on an older tree that still uses LLAMA_VULKAN, pass both:
+   rem cmake -B build -G "Visual Studio 17 2022" -A x64 -DLLAMA_CURL=OFF -DLLAMA_VULKAN=ON -DGGML_VULKAN=ON
    cmake --build build --config Release -j
    ```
-   > `-DLLAMA_CURL=OFF` avoids the curl dependency. Drop `-DLLAMA_VULKAN=ON` if you only want CPU.
+   > `-DLLAMA_CURL=OFF` avoids the curl dependency. Keep Vulkan on for AMD GPUs; drop the Vulkan flags only if you want CPU-only.
 2) **Smoke-test the binary (optional but recommended)**
    ```powershell
    .\build\bin\Release\llama-cli.exe -m C:\path\to\model.gguf -p "Hello! Summarize llama.cpp in one sentence." --gpu-layers 20
    ```
    Lower `--gpu-layers` if you hit OOM; remove it for CPU-only.
 3) **Copy the server binary where quick_launch can see it**
-   - Option A: copy `build\bin\Release\llama-server.exe` **plus all DLLs from the same folder (`ggml*.dll`, `llama.dll`, `mtmd.dll`, etc.)** into this repo’s `scripts\` folder. Missing DLLs → exit code `-1073741515`.
+   - Option A: copy **everything** from `build\bin\Release` into this repo’s `scripts\` folder: `llama-server.exe` **and all DLLs** (`ggml*.dll`, `llama.dll`, `mtmd.dll`, Vulkan-specific `ggml-vulkan*.dll`, etc.). Missing or blocked DLLs cause self-test errors like exit code `-1073741515 (0xC0000135)`, even if the log shows Vulkan devices detected.
    - Option B: leave it where it is and tell quick launch where to find it (the script also prepends that folder to `PATH` so co-located DLLs are found and self-tests `--version` to catch missing DLLs early):
      ```powershell
      .\scripts\quick_launch.ps1 -ServerBinary "C:\path\to\llama-server.exe" -ModelPath "C:\path\to\your-model.gguf"
      ```
    - If you see exit code `-1073741515 (0xC0000135)`, Windows could not load a DLL: keep all `ggml*.dll`, `llama.dll`, `mtmd.dll` beside the exe, unblock the files (Right-click > Properties > Unblock), and ensure the VC++ runtime for your build is installed.
+   - Seeing `ggml_vulkan: Found 2 Vulkan devices` is normal on systems with an iGPU + dGPU. If the self-test still fails, it’s almost always missing/blocked DLLs. To force the discrete GPU when two devices are present, set an env var before launching (supported on recent llama.cpp builds): `set GGML_VULKAN_DEVICE=1` (0-based index), or restrict ICDs via `VK_ICD_FILENAMES` so only the desired GPU is visible.
    - Manual check (helpful if quick_launch warns): from the repo root run `.\scripts\llama-server.exe --version`. If the command prints nothing but exits 0, still verify DLLs are present/unblocked. If it exits non-zero (especially `-1073741515`), a DLL is missing/blocked.
 4) **Point the Bonsai chatbot at your model**
    - Update `config.yaml` `model.path`, or pass `-ModelPath` to `scripts\quick_launch.ps1`.
