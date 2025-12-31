@@ -1,7 +1,7 @@
 param(
   [string]$ConfigFile = "config.yaml",
   [string]$ModelPath = "models\\bonsai-gguf.gguf",
-  [string]$ServerBinary = "C:\\Users\\loudo\\Desktop\\bonsai-chatbot\\bonsai-chatbot\\scripts\\llama-server.exe",
+  [string]$ServerBinary = "C:\\Users\\loudo\\llama.cpp\\build\\bin\\Release\\llama-server.exe",
   [string]$ApiHost = "0.0.0.0",
   [int]$ApiPort = 8010,
   [int]$UiPort = 3000,
