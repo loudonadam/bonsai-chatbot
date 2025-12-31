@@ -2,8 +2,14 @@
 setlocal
 
 REM Update the model path to your GGUF file
+<<<<<<< Updated upstream
 set MODEL_PATH=models\bonsai-gguf.gguf
 set SERVER_BIN=scripts\llama-server.exe
+=======
+set MODEL_PATH=C:\Users\loudo\Desktop\bonsai-chatbot\bonsai-chatbot\models\bonsai-gguf.gguf
+set SERVER_BIN=C:\Users\loudo\llama.cpp\build\bin\Release\llama-cli.exe
+set BASE_PORT=8080
+>>>>>>> Stashed changes
 set LOGS_DIR=%~dp0..\logs
 set STDOUT_LOG=%LOGS_DIR%\llama-server-stdout.log
 set STDERR_LOG=%LOGS_DIR%\llama-server-stderr.log
