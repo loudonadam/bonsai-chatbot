@@ -3,7 +3,8 @@ setlocal EnableExtensions EnableDelayedExpansion
 
 REM Update the model path to your GGUF file
 set MODEL_PATH=C:\Users\loudo\Desktop\bonsai-chatbot\bonsai-chatbot\models\bonsai-gguf.gguf
-set SERVER_BIN=C:\Users\loudo\llama.cpp\build\bin\Release\llama-cli.exe
+REM IMPORTANT: use llama-server.exe (llama-cli.exe does not support --host/--port)
+set SERVER_BIN=C:\Users\loudo\llama.cpp\build\bin\Release\llama-server.exe
 set BASE_PORT=8080
 set MAX_PORT_SEARCH=20
 set LOGS_DIR=%~dp0..\logs
@@ -30,6 +31,14 @@ if not exist "%LOGS_DIR%" (
 if not exist "%SERVER_BIN%" (
   echo llama-server.exe not found at %SERVER_BIN%
   echo Download the Windows release of llama.cpp and place llama-server.exe here.
+  pause
+  exit /b 1
+)
+
+for %%B in ("%SERVER_BIN%") do set "SERVER_NAME=%%~nxB"
+if /I "%SERVER_NAME%"=="llama-cli.exe" (
+  echo SERVER_BIN currently points to llama-cli.exe, which does not support --host/--port.
+  echo Please point SERVER_BIN to llama-server.exe instead.
   pause
   exit /b 1
 )
