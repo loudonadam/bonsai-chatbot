@@ -5,6 +5,7 @@ REM Update the model path to your GGUF file
 set MODEL_PATH=C:\Users\loudo\Desktop\bonsai-chatbot\bonsai-chatbot\models\bonsai-gguf.gguf
 set SERVER_BIN=C:\Users\loudo\llama.cpp\build\bin\Release\llama-cli.exe
 set BASE_PORT=8080
+set MAX_PORT_SEARCH=20
 set LOGS_DIR=%~dp0..\logs
 set STDOUT_LOG=%LOGS_DIR%\llama-server-stdout.log
 set STDERR_LOG=%LOGS_DIR%\llama-server-stderr.log
@@ -39,19 +40,32 @@ if not exist "%MODEL_PATH%" (
   exit /b 1
 )
 
-REM Check that port 8080 is free before launching.
-for /f "tokens=5" %%p in ('netstat -ano ^| findstr /r ":8080[ ]" ^| findstr LISTENING') do (
-  echo Port 8080 is already in use by PID %%p. Close the process or update scripts\start_model.bat to use a different port.
-  pause
-  exit /b 1
+REM Find the first available port starting at BASE_PORT.
+set PORT=%BASE_PORT%
+set /a MAX_PORT=%BASE_PORT% + %MAX_PORT_SEARCH%
+:CHECK_PORT
+set "PORT_IN_USE="
+for /f "tokens=5" %%p in ('netstat -ano ^| findstr /r ":%PORT%[ ]" ^| findstr LISTENING') do (
+  set PORT_IN_USE=%%p
 )
+if defined PORT_IN_USE (
+  echo Port %PORT% is already in use by PID %PORT_IN_USE%. Trying next port...
+  set /a PORT+=1
+  if %PORT% gtr %MAX_PORT% (
+    echo No free port found between %BASE_PORT% and %MAX_PORT%.
+    pause
+    exit /b 1
+  )
+  goto CHECK_PORT
+)
+echo Using port %PORT%.
 
 echo Writing llama.cpp logs to:
 echo   %STDOUT_LOG%
 echo   %STDERR_LOG%
 echo.
 
-"%SERVER_BIN%" --model "%MODEL_PATH%" --host 127.0.0.1 --port 8080 --ctx-size 4096 --n-gpu-layers -1 --embedding 1>>"%STDOUT_LOG%" 2>>"%STDERR_LOG%"
+"%SERVER_BIN%" --model "%MODEL_PATH%" --host 127.0.0.1 --port %PORT% --ctx-size 4096 --n-gpu-layers -1 --embedding 1>>"%STDOUT_LOG%" 2>>"%STDERR_LOG%"
 
 if %errorlevel% neq 0 (
   echo llama-server exited with error level %errorlevel%. Review the log files above for details.
