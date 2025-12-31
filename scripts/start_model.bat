@@ -1,5 +1,5 @@
 @echo off
-setlocal
+setlocal EnableExtensions EnableDelayedExpansion
 
 REM Update the model path to your GGUF file
 set MODEL_PATH=C:\Users\loudo\Desktop\bonsai-chatbot\bonsai-chatbot\models\bonsai-gguf.gguf
@@ -45,11 +45,13 @@ set PORT=%BASE_PORT%
 set /a MAX_PORT=%BASE_PORT% + %MAX_PORT_SEARCH%
 :CHECK_PORT
 set "PORT_IN_USE="
-for /f "tokens=5" %%p in ('netstat -ano ^| findstr /r ":%PORT%[ ]" ^| findstr LISTENING') do (
-  set PORT_IN_USE=%%p
+set "PORT_IN_USE_LINE="
+for /f "skip=4 tokens=1,2,5" %%a in ('netstat -ano -p tcp ^| findstr /R /C:":%PORT% .*LISTENING"') do (
+  set "PORT_IN_USE=%%c"
+  set "PORT_IN_USE_LINE=%%a %%b %%c"
 )
 if defined PORT_IN_USE (
-  echo Port %PORT% is already in use by PID %PORT_IN_USE%. Trying next port...
+  echo Port %PORT% is already in use by PID %PORT_IN_USE%. Details: !PORT_IN_USE_LINE!. Trying next port...
   set /a PORT+=1
   if %PORT% gtr %MAX_PORT% (
     echo No free port found between %BASE_PORT% and %MAX_PORT%.
