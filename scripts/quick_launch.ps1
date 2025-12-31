@@ -246,8 +246,8 @@ function Test-LlamaBinary {
         Write-Warning "Multiple Vulkan devices detected. No device matched pattern '$PreferredGpuPattern', so selecting index $($match.Index) ($($match.Name)) as a fallback (highest index). Use -VulkanDevice <index> to override."
       }
     } elseif (-not $match -and $deviceCount -and $deviceCount -gt 1) {
-      # If llama.cpp printed only the count but no device names, still try the highest index.
-      $fallbackIndex = $deviceCount - 1
+      # If llama.cpp printed only the count but no device names, default to index 0.
+      $fallbackIndex = 0
       $match = [pscustomobject]@{ Index = $fallbackIndex; Name = "(count-only, index $fallbackIndex)" }
       Write-Warning "Multiple Vulkan devices detected (count=$deviceCount), but no names were printed. Selecting index $fallbackIndex as a fallback. Use -VulkanDevice <index> or -VkIcdFilenames <path-to-AMD-ICD.json> to override explicitly."
     }
