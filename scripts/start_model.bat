@@ -2,8 +2,8 @@
 setlocal
 
 REM Update the model path to your GGUF file
-set MODEL_PATH=models\bonsai-gguf.gguf
-set SERVER_BIN=scripts\llama-server.exe
+set MODEL_PATH=C:\Users\loudo\Desktop\bonsai-chatbot\bonsai-chatbot\models\bonsai-gguf.gguf
+set SERVER_BIN=C:\Users\loudo\llama.cpp\build\bin\Release\llama-cli.exe
 set LOGS_DIR=%~dp0..\logs
 set STDOUT_LOG=%LOGS_DIR%\llama-server-stdout.log
 set STDERR_LOG=%LOGS_DIR%\llama-server-stderr.log
@@ -26,8 +26,8 @@ if not exist "%LOGS_DIR%" (
 )
 
 if not exist "%SERVER_BIN%" (
-  echo llama-server.exe not found at %SERVER_BIN%
-  echo Download the Windows release of llama.cpp and place llama-server.exe here.
+  echo llama-cli.exe not found at %SERVER_BIN%
+  echo Download the Windows release of llama.cpp and place llama-cli.exe here.
   pause
   exit /b 1
 )
@@ -50,7 +50,7 @@ echo   %STDOUT_LOG%
 echo   %STDERR_LOG%
 echo.
 
-"%SERVER_BIN%" --model "%MODEL_PATH%" --host 127.0.0.1 --port 8080 --ctx-size 4096 --n-gpu-layers -1 --embedding 1>>"%STDOUT_LOG%" 2>>"%STDERR_LOG%"
+"%SERVER_BIN%" --server --model "%MODEL_PATH%" --host 127.0.0.1 --port 8080 --ctx-size 4096 --n-gpu-layers -1 --embedding 1>>"%STDOUT_LOG%" 2>>"%STDERR_LOG%"
 
 if %errorlevel% neq 0 (
   echo llama-server exited with error level %errorlevel%. Review the log files above for details.
