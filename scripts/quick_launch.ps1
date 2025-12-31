@@ -1,7 +1,7 @@
 param(
   [string]$ConfigFile = "config.yaml",
   [string]$ModelPath = "models\\bonsai-gguf.gguf",
-  [string]$ServerBinary = "C:\\Users\\loudo\\Desktop\\bonsai-chatbot\\bonsai-chatbot\\scripts\\llama-server.exe",
+  [string]$ServerBinary = "C:\\Users\\loudo\\llama.cpp\\build\\bin\\Release\\llama-cli.exe",
   [string]$ApiHost = "0.0.0.0",
   [int]$ApiPort = 8010,
   [int]$UiPort = 3000,
@@ -246,8 +246,8 @@ function Test-LlamaBinary {
         Write-Warning "Multiple Vulkan devices detected. No device matched pattern '$PreferredGpuPattern', so selecting index $($match.Index) ($($match.Name)) as a fallback (highest index). Use -VulkanDevice <index> to override."
       }
     } elseif (-not $match -and $deviceCount -and $deviceCount -gt 1) {
-      # If llama.cpp printed only the count but no device names, still try the highest index.
-      $fallbackIndex = $deviceCount - 1
+      # If llama.cpp printed only the count but no device names, default to index 0.
+      $fallbackIndex = 0
       $match = [pscustomobject]@{ Index = $fallbackIndex; Name = "(count-only, index $fallbackIndex)" }
       Write-Warning "Multiple Vulkan devices detected (count=$deviceCount), but no names were printed. Selecting index $fallbackIndex as a fallback. Use -VulkanDevice <index> or -VkIcdFilenames <path-to-AMD-ICD.json> to override explicitly."
     }
@@ -553,10 +553,10 @@ try {
       Test-LlamaBinary -BinaryPath $ServerBinary -PreferredGpuPattern $PreferredVulkanGpuPattern -AutoSelectVulkan:$autoSelectVulkan -RegisteredDrivers $registeredDrivers -AutoFoundIcd $autoFoundIcd
 
       Assert-PortAvailable -Port 8080 -Name "Model (llama.cpp)"
-      $llamaArgs = @("--model", $ModelPath, "--host", "127.0.0.1", "--port", "8080", "--ctx-size", "4096", "--n-gpu-layers", "35", "--embedding")
+      $llamaArgs = @("--model", $ModelPath, "--host", "127.0.0.1", "--port", "8080", "--ctx-size", "4096", "--n-gpu-layers", "35", "--embedding", "--server")
       $processes += Start-LoggedProcess -Name "llama-server" -FilePath $ServerBinary -Args $llamaArgs
     } elseif (-not (Test-Path $ServerBinary)) {
-      Write-Warning "llama-server.exe not found at $ServerBinary; skipping model server."
+      Write-Warning "llama-cli.exe not found at $ServerBinary; skipping model server."
     } else {
       Write-Warning "Model file not found at $ModelPath; skipping model server."
     }
