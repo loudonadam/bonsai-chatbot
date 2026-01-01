@@ -4,6 +4,7 @@ import pathlib
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
+import os
 
 import httpx
 import yaml
@@ -29,6 +30,13 @@ class AppConfig:
     def load(path: pathlib.Path) -> "AppConfig":
         with path.open("r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
+
+        # Allow quick launch scripts to override the model API base without touching the YAML
+        env_api_base = os.getenv("BONSAI_MODEL_API_BASE")
+        if env_api_base:
+            data.setdefault("model", {})
+            data["model"]["api_base"] = env_api_base
+
         return AppConfig(**data)
 
 
