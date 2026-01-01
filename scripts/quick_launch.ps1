@@ -552,8 +552,15 @@ try {
       $autoSelectVulkan = (-not $ClearVulkanDevice) -and ($VulkanDevice -eq $null) -and (-not $env:GGML_VULKAN_DEVICE)
       Test-LlamaBinary -BinaryPath $ServerBinary -PreferredGpuPattern $PreferredVulkanGpuPattern -AutoSelectVulkan:$autoSelectVulkan -RegisteredDrivers $registeredDrivers -AutoFoundIcd $autoFoundIcd
 
-      Assert-PortAvailable -Port 8080 -Name "Model (llama.cpp)"
-      $llamaArgs = @("--model", $ModelPath, "--host", "127.0.0.1", "--port", "8080", "--ctx-size", "4096", "--n-gpu-layers", "35", "--embedding")
+      $serverName = Split-Path $ServerBinary -Leaf
+      if ($serverName -ieq "llama-cli.exe") {
+        throw "ServerBinary points to llama-cli.exe, which does not support --host/--port. Please use llama-server.exe."
+      }
+      $modelPortToUse = Get-AvailablePort -StartingPort 8080 -Name "Model (llama.cpp)"
+      if ($modelPortToUse -ne 8080) {
+        Write-Host "[INFO] Model port 8080 is busy. Using $modelPortToUse instead." -ForegroundColor Yellow
+      }
+      $llamaArgs = @("--model", $ModelPath, "--host", "127.0.0.1", "--port", "$modelPortToUse", "--ctx-size", "4096", "--n-gpu-layers", "35", "--embedding")
       $processes += Start-LoggedProcess -Name "llama-server" -FilePath $ServerBinary -Args $llamaArgs
     } elseif (-not (Test-Path $ServerBinary)) {
       Write-Warning "llama-server.exe not found at $ServerBinary; skipping model server."
