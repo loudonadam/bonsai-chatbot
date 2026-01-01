@@ -198,7 +198,7 @@ function Start-WithPortRetry {
   $port = $BasePort
   for ($i = 0; $i -lt $MaxAttempts; $i++) {
     try {
-      $result = & $StartBlock.InvokeReturnAsIs($port)
+      $result = & $StartBlock $port
       return $result
     } catch {
       $msg = $_.Exception.Message
