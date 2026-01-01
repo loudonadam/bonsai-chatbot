@@ -124,7 +124,8 @@ function Start-LoggedProcess {
     [string]$StdoutPath,
     [string]$StderrPath,
     [string]$WorkingDir,
-    [int]$ValidateSeconds = 3
+    [int]$ValidateSeconds = 3,
+    [string]$WindowStyle = "Minimized"
   )
 
   if (-not (Test-Path $FilePath)) {
@@ -144,7 +145,7 @@ function Start-LoggedProcess {
     WorkingDirectory       = $WorkingDir
     RedirectStandardOutput = $StdoutPath
     RedirectStandardError  = $StderrPath
-    WindowStyle            = "Hidden"
+    WindowStyle            = $WindowStyle
     PassThru               = $true
   }
   if ($cleanArgs.Count -gt 0) {
@@ -298,10 +299,10 @@ try {
     }
     if ($uvicornCmd -ne $pythonCmd) {
       $apiArgs = @("app.main:app", "--host", $ApiHost, "--port", $port)
-      $proc = Start-LoggedProcess -Name "api" -FilePath $uvicornCmd -Args $apiArgs -StdoutPath $apiStdout -StderrPath $apiStderr -WorkingDir $repoRoot
+      $proc = Start-LoggedProcess -Name "api" -FilePath $uvicornCmd -Args $apiArgs -StdoutPath $apiStdout -StderrPath $apiStderr -WorkingDir $repoRoot -WindowStyle "Normal"
     } else {
       $apiArgs = @("-I", "-m", "uvicorn", "app.main:app", "--host", $ApiHost, "--port", $port)
-      $proc = Start-LoggedProcess -Name "api" -FilePath $pythonCmd -Args $apiArgs -StdoutPath $apiStdout -StderrPath $apiStderr -WorkingDir $repoRoot
+      $proc = Start-LoggedProcess -Name "api" -FilePath $pythonCmd -Args $apiArgs -StdoutPath $apiStdout -StderrPath $apiStderr -WorkingDir $repoRoot -WindowStyle "Normal"
     }
     return @{ Proc = $proc; Port = $port }
   }
@@ -317,7 +318,7 @@ try {
     Write-UiConfig -RepoRoot $repoRoot -ApiBase $uiApiBase
     Write-Host "[INFO] Wrote ui\\config.js pointing to $uiApiBase" -ForegroundColor Cyan
     $uiArgs = @("-I", "-m", "http.server", "$port", "-d", "ui")
-    $proc = Start-LoggedProcess -Name "ui" -FilePath $pythonCmd -Args $uiArgs -StdoutPath $uiStdout -StderrPath $uiStderr -WorkingDir $repoRoot
+    $proc = Start-LoggedProcess -Name "ui" -FilePath $pythonCmd -Args $uiArgs -StdoutPath $uiStdout -StderrPath $uiStderr -WorkingDir $repoRoot -WindowStyle "Normal"
     return @{ Proc = $proc; Port = $port }
   }
   $processes += $uiResult.Proc
