@@ -10,5 +10,5 @@ if not exist "%PS_SCRIPT%" (
   exit /b 1
 )
 
-powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%PS_SCRIPT%"
+powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -NoExit -File "%PS_SCRIPT%"
 endlocal
