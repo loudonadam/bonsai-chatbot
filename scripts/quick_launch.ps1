@@ -180,7 +180,7 @@ try {
   if (-not $SkipModel -and $modelPort) {
     Write-Host "[INFO] Model server: http://127.0.0.1:$modelPort" -ForegroundColor Cyan
   }
-  Write-Host "[INFO] API:   http://$ApiHost:$apiPort" -ForegroundColor Cyan
+  Write-Host ("[INFO] API:   http://{0}:{1}" -f $ApiHost, $apiPort) -ForegroundColor Cyan
   Write-Host "[INFO] UI:    http://localhost:$uiPort" -ForegroundColor Cyan
   Write-Host "[INFO] Logs:  $logsDir" -ForegroundColor Cyan
   Write-Host "[INFO] Press Enter to stop all processes." -ForegroundColor Yellow
