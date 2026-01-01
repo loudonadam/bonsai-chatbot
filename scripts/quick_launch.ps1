@@ -189,6 +189,9 @@ function Start-LoggedProcess {
 
 try {
   $env:PYTHONNOUSERSITE = "1"
+  $env:PYTHONSTARTUP = ""
+  $env:PYTHONINSPECT = ""
+  $env:PYTHONPATH = ""
 
   $pythonCmd = $null
   $bootstrapPython = $null
@@ -238,6 +241,7 @@ try {
     $modelArgs = @(
       "--model", $ModelPath,
       "--alias", "local-llm",
+      "--no-router",
       "--host", "127.0.0.1",
       "--port", "$modelPort",
       "--ctx-size", "4096",
@@ -257,7 +261,7 @@ try {
   if ($apiPort -ne $ApiPort) {
     Write-Host "[INFO] API base port $ApiPort in use; switching to $apiPort." -ForegroundColor Yellow
   }
-  $apiArgs = @("-m", "uvicorn", "app.main:app", "--host", $ApiHost, "--port", $apiPort)
+  $apiArgs = @("-I", "-m", "uvicorn", "app.main:app", "--host", $ApiHost, "--port", $apiPort)
   $processes += Start-LoggedProcess -Name "api" -FilePath $pythonCmd -Args $apiArgs -StdoutPath $apiStdout -StderrPath $apiStderr -WorkingDir $repoRoot
 
   $uiPort = Get-AvailablePort -StartingPort $UiPort -MaxAttempts $MaxPortSearch -Name "UI port"
@@ -267,7 +271,7 @@ try {
   $uiApiBase = "http://localhost:$apiPort"
   Write-UiConfig -RepoRoot $repoRoot -ApiBase $uiApiBase
   Write-Host "[INFO] Wrote ui\\config.js pointing to $uiApiBase" -ForegroundColor Cyan
-  $uiArgs = @("-m", "http.server", "$uiPort", "-d", "ui")
+  $uiArgs = @("-I", "-m", "http.server", "$uiPort", "-d", "ui")
   $processes += Start-LoggedProcess -Name "ui" -FilePath $pythonCmd -Args $uiArgs -StdoutPath $uiStdout -StderrPath $uiStderr -WorkingDir $repoRoot
 
   if (-not $NoBrowser) {
