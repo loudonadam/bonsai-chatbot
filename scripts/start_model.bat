@@ -1,10 +1,12 @@
 @echo off
-setlocal
+setlocal EnableExtensions EnableDelayedExpansion
 
 REM Update the model path to your GGUF file
 set MODEL_PATH=C:\Users\loudo\Desktop\bonsai-chatbot\bonsai-chatbot\models\bonsai-gguf.gguf
-set SERVER_BIN=C:\Users\loudo\llama.cpp\build\bin\Release\llama-cli.exe
+REM IMPORTANT: use llama-server.exe (llama-cli.exe does not support --host/--port)
+set SERVER_BIN=C:\Users\loudo\llama.cpp\build\bin\Release\llama-server.exe
 set BASE_PORT=8080
+set MAX_PORT_SEARCH=20
 set LOGS_DIR=%~dp0..\logs
 set STDOUT_LOG=%LOGS_DIR%\llama-server-stdout.log
 set STDERR_LOG=%LOGS_DIR%\llama-server-stderr.log
@@ -33,25 +35,48 @@ if not exist "%SERVER_BIN%" (
   exit /b 1
 )
 
+for %%B in ("%SERVER_BIN%") do set "SERVER_NAME=%%~nxB"
+if /I "%SERVER_NAME%"=="llama-cli.exe" (
+  echo SERVER_BIN currently points to llama-cli.exe, which does not support --host/--port.
+  echo Please point SERVER_BIN to llama-server.exe instead.
+  pause
+  exit /b 1
+)
+
 if not exist "%MODEL_PATH%" (
   echo Model file not found at %MODEL_PATH%
   pause
   exit /b 1
 )
 
-REM Check that port 8080 is free before launching.
-for /f "tokens=5" %%p in ('netstat -ano ^| findstr /r ":8080[ ]" ^| findstr LISTENING') do (
-  echo Port 8080 is already in use by PID %%p. Close the process or update scripts\start_model.bat to use a different port.
-  pause
-  exit /b 1
+REM Find the first available port starting at BASE_PORT.
+set PORT=%BASE_PORT%
+set /a MAX_PORT=%BASE_PORT% + %MAX_PORT_SEARCH%
+:CHECK_PORT
+set "PORT_IN_USE="
+set "PORT_IN_USE_LINE="
+for /f "skip=4 tokens=1,2,5" %%a in ('netstat -ano -p tcp ^| findstr /R /C:":%PORT% .*LISTENING"') do (
+  set "PORT_IN_USE=%%c"
+  set "PORT_IN_USE_LINE=%%a %%b %%c"
 )
+if defined PORT_IN_USE (
+  echo Port %PORT% is already in use by PID %PORT_IN_USE%. Details: !PORT_IN_USE_LINE!. Trying next port...
+  set /a PORT+=1
+  if %PORT% gtr %MAX_PORT% (
+    echo No free port found between %BASE_PORT% and %MAX_PORT%.
+    pause
+    exit /b 1
+  )
+  goto CHECK_PORT
+)
+echo Using port %PORT%.
 
 echo Writing llama.cpp logs to:
 echo   %STDOUT_LOG%
 echo   %STDERR_LOG%
 echo.
 
-"%SERVER_BIN%" --model "%MODEL_PATH%" --host 127.0.0.1 --port 8080 --ctx-size 4096 --n-gpu-layers -1 --embedding 1>>"%STDOUT_LOG%" 2>>"%STDERR_LOG%"
+"%SERVER_BIN%" --model "%MODEL_PATH%" --host 127.0.0.1 --port %PORT% --ctx-size 4096 --n-gpu-layers -1 --embedding 1>>"%STDOUT_LOG%" 2>>"%STDERR_LOG%"
 
 if %errorlevel% neq 0 (
   echo llama-server exited with error level %errorlevel%. Review the log files above for details.
