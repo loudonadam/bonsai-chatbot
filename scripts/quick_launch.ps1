@@ -80,14 +80,24 @@ function Start-LoggedProcess {
     throw "$Name failed to start because file was not found: $FilePath"
   }
 
+  $cleanArgs = @()
+  if ($Args) {
+    $cleanArgs = $Args | Where-Object { $_ -ne $null -and "$_" -ne "" }
+    if ($cleanArgs.Count -ne $Args.Count) {
+      throw "$Name received an empty or null argument. Please check the inputs."
+    }
+  }
+
   $startParams = @{
     FilePath               = $FilePath
-    ArgumentList           = $Args
     WorkingDirectory       = $WorkingDir
     RedirectStandardOutput = $StdoutPath
     RedirectStandardError  = $StderrPath
     WindowStyle            = "Hidden"
     PassThru               = $true
+  }
+  if ($cleanArgs.Count -gt 0) {
+    $startParams.ArgumentList = $cleanArgs
   }
 
   $proc = Start-Process @startParams
