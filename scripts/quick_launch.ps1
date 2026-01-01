@@ -125,9 +125,21 @@ function Start-LoggedProcess {
 }
 
 try {
-  $pythonCmd = "python"
-  if (-not (Get-Command $pythonCmd -ErrorAction SilentlyContinue)) {
-    throw "Python not found on PATH. Install Python 3.11+ and retry."
+  $pythonCmd = $null
+  $pythonPrefixArgs = @()
+  $venvPython = Join-Path $repoRoot ".venv\\Scripts\\python.exe"
+  if (Test-Path $venvPython) {
+    $pythonCmd = $venvPython
+    Write-Host "[INFO] Using venv Python at $pythonCmd" -ForegroundColor Cyan
+  } elseif ($cmd = Get-Command "python" -ErrorAction SilentlyContinue) {
+    $pythonCmd = $cmd.Path
+    Write-Host "[INFO] Using Python from PATH: $pythonCmd" -ForegroundColor Cyan
+  } elseif (Get-Command "py" -ErrorAction SilentlyContinue) {
+    $pythonCmd = "py"
+    $pythonPrefixArgs = @("-3")
+    Write-Host "[INFO] Using Windows Python launcher (py -3)" -ForegroundColor Cyan
+  } else {
+    throw "Python not found. Install Python 3.11+, or create a .venv, or ensure 'py'/'python' is on PATH."
   }
 
   if (-not (Test-Path $ConfigFile)) {
@@ -171,14 +183,14 @@ try {
   if ($apiPort -ne $ApiPort) {
     Write-Host "[INFO] API base port $ApiPort in use; switching to $apiPort." -ForegroundColor Yellow
   }
-  $apiArgs = @("-m", "uvicorn", "app.main:app", "--host", $ApiHost, "--port", $apiPort)
+  $apiArgs = $pythonPrefixArgs + @("-m", "uvicorn", "app.main:app", "--host", $ApiHost, "--port", $apiPort)
   $processes += Start-LoggedProcess -Name "api" -FilePath $pythonCmd -Args $apiArgs -StdoutPath $apiStdout -StderrPath $apiStderr -WorkingDir $repoRoot
 
   $uiPort = Get-AvailablePort -StartingPort $UiPort -MaxAttempts $MaxPortSearch -Name "UI port"
   if ($uiPort -ne $UiPort) {
     Write-Host "[INFO] UI base port $UiPort in use; switching to $uiPort." -ForegroundColor Yellow
   }
-  $uiArgs = @("-m", "http.server", "$uiPort", "-d", "ui")
+  $uiArgs = $pythonPrefixArgs + @("-m", "http.server", "$uiPort", "-d", "ui")
   $processes += Start-LoggedProcess -Name "ui" -FilePath $pythonCmd -Args $uiArgs -StdoutPath $uiStdout -StderrPath $uiStderr -WorkingDir $repoRoot
 
   if (-not $NoBrowser) {
