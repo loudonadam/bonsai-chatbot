@@ -73,7 +73,8 @@ function Start-LoggedProcess {
     [string[]]$Args = @(),
     [string]$StdoutPath,
     [string]$StderrPath,
-    [string]$WorkingDir
+    [string]$WorkingDir,
+    [int]$ValidateSeconds = 3
   )
 
   if (-not (Test-Path $FilePath)) {
@@ -104,20 +105,32 @@ function Start-LoggedProcess {
   Start-Sleep -Milliseconds 400
   Wait-Process -Id $proc.Id -Timeout 1 -ErrorAction SilentlyContinue | Out-Null
 
-  if ($proc.HasExited) {
-    $code = $proc.ExitCode
-    $errTail = ""
-    if (Test-Path $StderrPath) {
-      $errTail = (Get-Content -Path $StderrPath -Tail 20 -ErrorAction SilentlyContinue) -join "`n"
+  $startTime = Get-Date
+  while ($true) {
+    if ($proc.HasExited) {
+      $code = $proc.ExitCode
+      $errTail = ""
+      if (Test-Path $StderrPath) {
+        $errTail = (Get-Content -Path $StderrPath -Tail 40 -ErrorAction SilentlyContinue) -join "`n"
+      }
+      $outTail = ""
+      if (Test-Path $StdoutPath) {
+        $outTail = (Get-Content -Path $StdoutPath -Tail 20 -ErrorAction SilentlyContinue) -join "`n"
+      }
+      $msg = "$Name exited with code $code. Command: `"$FilePath`" $($Args -join ' ')."
+      if ($errTail) { $msg += "`nLast stderr lines:`n$errTail" }
+      if (-not $errTail -and $outTail) { $msg += "`nLast stdout lines:`n$outTail" }
+      if ($Name -eq "api" -and $errTail -match "bind.*10048|port.*in use") {
+        $msg += "`nPort conflict detected. Rerun with -ApiPort <port> or stop the conflicting process."
+      }
+      if ($Name -eq "ui" -and $errTail -match "bind|address already in use") {
+        $msg += "`nPort conflict detected. Rerun with -UiPort <port> or stop the conflicting process."
+      }
+      throw $msg
     }
-    $outTail = ""
-    if (Test-Path $StdoutPath) {
-      $outTail = (Get-Content -Path $StdoutPath -Tail 10 -ErrorAction SilentlyContinue) -join "`n"
-    }
-    $msg = "$Name exited immediately with code $code. Command: `"$FilePath`" $($Args -join ' ')."
-    if ($errTail) { $msg += "`nLast stderr lines:`n$errTail" }
-    if (-not $errTail -and $outTail) { $msg += "`nLast stdout lines:`n$outTail" }
-    throw $msg
+    $elapsed = (Get-Date) - $startTime
+    if ($elapsed.TotalSeconds -ge $ValidateSeconds) { break }
+    Start-Sleep -Milliseconds 300
   }
 
   Write-Host "[STARTED] $Name (stdout: $StdoutPath, stderr: $StderrPath)"
