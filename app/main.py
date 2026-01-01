@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 import os
+import json
 
 import httpx
 import yaml
@@ -88,6 +89,88 @@ def get_app(config_path: pathlib.Path = pathlib.Path("config.yaml")) -> FastAPI:
         answer: str
         sources: List[Dict[str, str]]
 
+    async def _call_llm(prompt: str) -> str:
+        api_base = app_config.model.get("api_base", "http://127.0.0.1:8080/v1")
+        model_name = app_config.model.get("name", "local-llm")
+        max_tokens = app_config.model.get("max_tokens", 512)
+        temperature = app_config.model.get("temperature", 0.7)
+
+        chat_body = {
+            "model": model_name,
+            "messages": [
+                {"role": "system", "content": "You are a helpful bonsai assistant."},
+                {"role": "user", "content": prompt},
+            ],
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "stream": False,
+        }
+
+        def _extract_chat_content(payload: Dict[str, Any]) -> Optional[str]:
+            return payload.get("choices", [{}])[0].get("message", {}).get("content")
+
+        def _extract_completion_content(payload: Dict[str, Any]) -> Optional[str]:
+            return payload.get("choices", [{}])[0].get("text")
+
+        client: Optional[httpx.AsyncClient] = getattr(app.state, "http_client", None)
+        if client is None:
+            raise HTTPException(
+                status_code=500,
+                detail="HTTP client not initialized; FastAPI lifespan may not have started.",
+            )
+
+        try:
+            resp = await client.post(f"{api_base}/chat/completions", json=chat_body)
+            resp.raise_for_status()
+            data = resp.json()
+            content = _extract_chat_content(data)
+            if content:
+                return content
+            logger.warning("Empty chat completion content; falling back to /v1/completions")
+        except httpx.HTTPStatusError as exc:
+            # Common on router builds without chat support or when model name mismatches
+            resp_text = exc.response.text
+            if exc.response.status_code in (400, 404):
+                logger.warning(
+                    "Chat completion failed (%s). Falling back to /v1/completions. Body: %s",
+                    exc.response.status_code,
+                    resp_text,
+                )
+            else:
+                raise HTTPException(
+                    status_code=exc.response.status_code,
+                    detail=f"Model call failed: {exc}. Response: {resp_text}",
+                ) from exc
+        except Exception as exc:  # pragma: no cover - runtime guardrail
+            raise HTTPException(status_code=500, detail=f"Model call failed: {exc}") from exc
+
+        # Fallback: /v1/completions for older llama.cpp servers or missing chat support
+        completion_body = {
+            "model": model_name,
+            "prompt": prompt,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "stream": False,
+        }
+        try:
+            resp = await client.post(f"{api_base}/completions", json=completion_body)
+            resp.raise_for_status()
+            data = resp.json()
+            content = _extract_completion_content(data)
+            if not content:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Empty response from model after fallback to /v1/completions",
+                )
+            return content
+        except httpx.HTTPStatusError as exc:
+            raise HTTPException(
+                status_code=exc.response.status_code,
+                detail=f"Model call failed after fallback: {exc}. Response: {exc.response.text}",
+            ) from exc
+        except Exception as exc:  # pragma: no cover - runtime guardrail
+            raise HTTPException(status_code=500, detail=f"Model call failed after fallback: {exc}")
+
     @app.get("/health")
     async def health() -> Dict[str, str]:
         return {"status": "ok"}
@@ -102,40 +185,16 @@ def get_app(config_path: pathlib.Path = pathlib.Path("config.yaml")) -> FastAPI:
             raise HTTPException(status_code=500, detail=str(exc))
         prompt = rag.build_prompt(payload.question, hits)
 
-        api_base = app_config.model.get("api_base", "http://127.0.0.1:8080/v1")
-        body = {
-            "model": "local-llm",
-            "messages": [
-                {"role": "system", "content": "You are a helpful bonsai assistant."},
-                {"role": "user", "content": prompt},
-            ],
-            "max_tokens": app_config.model.get("max_tokens", 512),
-            "temperature": app_config.model.get("temperature", 0.7),
-            "stream": False,
-        }
-
         try:
-            client: Optional[httpx.AsyncClient] = getattr(app.state, "http_client", None)
-            if client is None:
-                raise RuntimeError("HTTP client not initialized; FastAPI lifespan may not have started.")
-            resp = await client.post(f"{api_base}/chat/completions", json=body)
-            resp.raise_for_status()
-            data = resp.json()
-            content: Optional[str] = data.get("choices", [{}])[0].get("message", {}).get("content")
+            content = await _call_llm(prompt)
         except httpx.ConnectError as exc:  # pragma: no cover - runtime errors reported to user
+            api_base = app_config.model.get("api_base", "http://127.0.0.1:8080/v1")
             hint = (
                 f"Failed to reach LLM server at {api_base}. "
                 "Make sure llama.cpp is running (e.g., scripts/start_model.bat) "
                 "and that config.model.api_base matches the server URL."
             )
             raise HTTPException(status_code=502, detail=hint) from exc
-        except httpx.HTTPStatusError as exc:  # pragma: no cover - runtime errors reported to user
-            raise HTTPException(status_code=exc.response.status_code, detail=f"Model call failed: {exc}") from exc
-        except Exception as exc:  # pragma: no cover - runtime errors reported to user
-            raise HTTPException(status_code=500, detail=f"Model call failed: {exc}") from exc
-
-        if not content:
-            raise HTTPException(status_code=500, detail="Empty response from model")
 
         return AskResponse(answer=content.strip(), sources=list(hits))
 
