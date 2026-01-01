@@ -218,12 +218,17 @@ try {
   $env:PYTHONSTARTUP = ""
   $env:PYTHONINSPECT = ""
   $env:PYTHONPATH = ""
+  $env:PYTHONIOENCODING = "utf-8"
+  $env:PYTHONUNBUFFERED = "1"
 
   $pythonCmd = $null
+  $uvicornCmd = $null
   $bootstrapPython = $null
   $venvPython = Join-Path $repoRoot ".venv\\Scripts\\python.exe"
   if (Test-Path $venvPython) {
     $pythonCmd = $venvPython
+    $uvicornExe = Join-Path $repoRoot ".venv\\Scripts\\uvicorn.exe"
+    if (Test-Path $uvicornExe) { $uvicornCmd = $uvicornExe }
     Write-Host "[INFO] Using existing venv Python at $pythonCmd" -ForegroundColor Cyan
   } else {
     if ($cmd = Get-Command "python" -ErrorAction SilentlyContinue) {
@@ -237,7 +242,10 @@ try {
     }
     $pythonCmd = Ensure-VenvPython -RepoRoot $repoRoot -BootstrapPython $bootstrapPython
     Write-Host "[INFO] Activated venv Python at $pythonCmd" -ForegroundColor Cyan
+    $uvicornExe = Join-Path $repoRoot ".venv\\Scripts\\uvicorn.exe"
+    if (Test-Path $uvicornExe) { $uvicornCmd = $uvicornExe }
   }
+  if (-not $uvicornCmd) { $uvicornCmd = $pythonCmd }
 
   if (-not (Test-Path $ConfigFile)) {
     throw "$ConfigFile not found. Copy config.example.yaml to $ConfigFile and update paths."
@@ -288,8 +296,13 @@ try {
     if ($port -ne $ApiPort) {
       Write-Host "[INFO] API base port $ApiPort in use; switching to $port." -ForegroundColor Yellow
     }
-    $apiArgs = @("-I", "-m", "uvicorn", "app.main:app", "--host", $ApiHost, "--port", $port)
-    $proc = Start-LoggedProcess -Name "api" -FilePath $pythonCmd -Args $apiArgs -StdoutPath $apiStdout -StderrPath $apiStderr -WorkingDir $repoRoot
+    if ($uvicornCmd -ne $pythonCmd) {
+      $apiArgs = @("app.main:app", "--host", $ApiHost, "--port", $port)
+      $proc = Start-LoggedProcess -Name "api" -FilePath $uvicornCmd -Args $apiArgs -StdoutPath $apiStdout -StderrPath $apiStderr -WorkingDir $repoRoot
+    } else {
+      $apiArgs = @("-I", "-m", "uvicorn", "app.main:app", "--host", $ApiHost, "--port", $port)
+      $proc = Start-LoggedProcess -Name "api" -FilePath $pythonCmd -Args $apiArgs -StdoutPath $apiStdout -StderrPath $apiStderr -WorkingDir $repoRoot
+    }
     return @{ Proc = $proc; Port = $port }
   }
   $processes += $apiResult.Proc
