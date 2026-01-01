@@ -33,10 +33,14 @@ if (-not (Test-Path $ServerBinary) -and (Test-Path $defaultRepoServer)) {
   Write-Host "[INFO] ServerBinary not found at provided path. Falling back to $defaultRepoServer" -ForegroundColor Yellow
   $ServerBinary = $defaultRepoServer
 }
+$resolvedServer = (Resolve-Path -Path $ServerBinary -ErrorAction SilentlyContinue)
+if ($resolvedServer) { $ServerBinary = $resolvedServer.Path }
 $dllExitHint = "Exit code -1073741515 (0xC0000135) usually means a missing DLL or blocked binary. Ensure ggml*.dll, llama.dll, mtmd.dll sit next to llama-server.exe, and right-click > Properties > Unblock. If you built llama.cpp yourself, copy everything from build\\bin\\Release next to the exe."
 
 Write-Host "[INFO] Bonsai Chatbot quick launch (single PowerShell window)" -ForegroundColor Cyan
 Write-Host "[INFO] Repo root: $repoRoot"
+Write-Host "[INFO] Model path: $ModelPath"
+Write-Host "[INFO] Server binary: $ServerBinary"
 
 $logsDir = Join-Path $repoRoot "logs"
 New-Item -ItemType Directory -Force -Path $logsDir | Out-Null
@@ -363,6 +367,22 @@ try {
     }
   }
 
+  function Assert-LlamaRuntimeFiles {
+    param(
+      [string]$BinaryPath
+    )
+    if (-not (Test-Path $BinaryPath)) {
+      throw "llama-server.exe not found at $BinaryPath"
+    }
+    $binaryDir = Split-Path $BinaryPath -Parent
+    $ggmlDlls = @(Get-ChildItem -Path $binaryDir -Filter "ggml*.dll" -ErrorAction SilentlyContinue)
+    $hasLlamaDll = Test-Path (Join-Path $binaryDir "llama.dll")
+    $hasMtmdDll = Test-Path (Join-Path $binaryDir "mtmd.dll")
+    if (($ggmlDlls.Count -eq 0) -and (-not $hasLlamaDll) -and (-not $hasMtmdDll)) {
+      throw "Missing llama.cpp runtime DLLs next to $BinaryPath. Copy ggml*.dll, llama.dll, and mtmd.dll from your llama.cpp build (e.g., build\\bin\\Release) into the same directory as llama-server.exe, then rerun."
+    }
+  }
+
   function Get-AvailablePort {
     param(
       [int]$StartingPort,
@@ -555,6 +575,7 @@ try {
       }
 
       # Quick self-test to surface DLL issues before the logged launch.
+      Assert-LlamaRuntimeFiles -BinaryPath $ServerBinary
       $autoSelectVulkan = (-not $ClearVulkanDevice) -and ($VulkanDevice -eq $null) -and (-not $env:GGML_VULKAN_DEVICE)
       Test-LlamaBinary -BinaryPath $ServerBinary -PreferredGpuPattern $PreferredVulkanGpuPattern -AutoSelectVulkan:$autoSelectVulkan -RegisteredDrivers $registeredDrivers -AutoFoundIcd $autoFoundIcd
 
