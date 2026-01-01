@@ -125,7 +125,8 @@ function Start-LoggedProcess {
     [string]$StderrPath,
     [string]$WorkingDir,
     [int]$ValidateSeconds = 3,
-    [string]$WindowStyle = "Minimized"
+    [string]$WindowStyle = "Minimized",
+    [switch]$NoRedirect
   )
 
   if (-not (Test-Path $FilePath)) {
@@ -141,12 +142,14 @@ function Start-LoggedProcess {
   }
 
   $startParams = @{
-    FilePath               = $FilePath
-    WorkingDirectory       = $WorkingDir
-    RedirectStandardOutput = $StdoutPath
-    RedirectStandardError  = $StderrPath
-    WindowStyle            = $WindowStyle
-    PassThru               = $true
+    FilePath         = $FilePath
+    WorkingDirectory = $WorkingDir
+    WindowStyle      = $WindowStyle
+    PassThru         = $true
+  }
+  if (-not $NoRedirect) {
+    $startParams.RedirectStandardOutput = $StdoutPath
+    $startParams.RedirectStandardError  = $StderrPath
   }
   if ($cleanArgs.Count -gt 0) {
     $startParams.ArgumentList = $cleanArgs
@@ -184,7 +187,11 @@ function Start-LoggedProcess {
     Start-Sleep -Milliseconds 300
   }
 
-  Write-Host "[STARTED] $Name (stdout: $StdoutPath, stderr: $StderrPath)"
+  if ($NoRedirect) {
+    Write-Host "[STARTED] $Name (console visible; no log redirection)"
+  } else {
+    Write-Host "[STARTED] $Name (stdout: $StdoutPath, stderr: $StderrPath)"
+  }
   return $proc
 }
 
@@ -299,10 +306,10 @@ try {
     }
     if ($uvicornCmd -ne $pythonCmd) {
       $apiArgs = @("app.main:app", "--host", $ApiHost, "--port", $port)
-      $proc = Start-LoggedProcess -Name "api" -FilePath $uvicornCmd -Args $apiArgs -StdoutPath $apiStdout -StderrPath $apiStderr -WorkingDir $repoRoot -WindowStyle "Normal"
+      $proc = Start-LoggedProcess -Name "api" -FilePath $uvicornCmd -Args $apiArgs -StdoutPath $apiStdout -StderrPath $apiStderr -WorkingDir $repoRoot -WindowStyle "Normal" -NoRedirect
     } else {
-      $apiArgs = @("-I", "-m", "uvicorn", "app.main:app", "--host", $ApiHost, "--port", $port)
-      $proc = Start-LoggedProcess -Name "api" -FilePath $pythonCmd -Args $apiArgs -StdoutPath $apiStdout -StderrPath $apiStderr -WorkingDir $repoRoot -WindowStyle "Normal"
+      $apiArgs = @("-s", "-E", "-I", "-m", "uvicorn", "app.main:app", "--host", $ApiHost, "--port", $port)
+      $proc = Start-LoggedProcess -Name "api" -FilePath $pythonCmd -Args $apiArgs -StdoutPath $apiStdout -StderrPath $apiStderr -WorkingDir $repoRoot -WindowStyle "Normal" -NoRedirect
     }
     return @{ Proc = $proc; Port = $port }
   }
@@ -318,7 +325,7 @@ try {
     Write-UiConfig -RepoRoot $repoRoot -ApiBase $uiApiBase
     Write-Host "[INFO] Wrote ui\\config.js pointing to $uiApiBase" -ForegroundColor Cyan
     $uiArgs = @("-I", "-m", "http.server", "$port", "-d", "ui")
-    $proc = Start-LoggedProcess -Name "ui" -FilePath $pythonCmd -Args $uiArgs -StdoutPath $uiStdout -StderrPath $uiStderr -WorkingDir $repoRoot -WindowStyle "Normal"
+    $proc = Start-LoggedProcess -Name "ui" -FilePath $pythonCmd -Args $uiArgs -StdoutPath $uiStdout -StderrPath $uiStderr -WorkingDir $repoRoot -WindowStyle "Normal" -NoRedirect
     return @{ Proc = $proc; Port = $port }
   }
   $processes += $uiResult.Proc
