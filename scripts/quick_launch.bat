@@ -1,5 +1,5 @@
 @echo off
-REM Wrapper to keep the window open when running the PowerShell quick launch script.
+REM Wrapper to run the PowerShell quick launch script that mirrors start_model.bat.
 setlocal
 set SCRIPT_DIR=%~dp0
 set PS_SCRIPT=%SCRIPT_DIR%quick_launch.ps1
@@ -10,6 +10,5 @@ if not exist "%PS_SCRIPT%" (
   exit /b 1
 )
 
-REM -NoExit ensures the window stays open so any error messages are visible.
-powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -NoExit -File "%PS_SCRIPT%"
+powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%PS_SCRIPT%"
 endlocal
