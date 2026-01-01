@@ -195,6 +195,28 @@ function Start-LoggedProcess {
   return $proc
 }
 
+function Start-CmdProcess {
+  param(
+    [string]$Name,
+    [string]$CmdPath,
+    [string]$Arguments,
+    [string]$WorkingDir
+  )
+
+  $startParams = @{
+    FilePath         = "cmd.exe"
+    WorkingDirectory = $WorkingDir
+    ArgumentList     = @("/k", "`"$CmdPath`" $Arguments")
+    WindowStyle      = "Normal"
+    PassThru         = $true
+  }
+
+  $proc = Start-Process @startParams
+  Start-Sleep -Milliseconds 400
+  Write-Host "[STARTED] $Name (interactive console window)" -ForegroundColor Cyan
+  return $proc
+}
+
 function Start-WithPortRetry {
   param(
     [string]$Name,
@@ -306,10 +328,10 @@ try {
     }
     if ($uvicornCmd -ne $pythonCmd) {
       $apiArgs = @("app.main:app", "--host", $ApiHost, "--port", $port)
-      $proc = Start-LoggedProcess -Name "api" -FilePath $uvicornCmd -Args $apiArgs -StdoutPath $apiStdout -StderrPath $apiStderr -WorkingDir $repoRoot -WindowStyle "Normal" -NoRedirect
+      $proc = Start-CmdProcess -Name "api" -CmdPath $uvicornCmd -Arguments ($apiArgs -join " ") -WorkingDir $repoRoot
     } else {
       $apiArgs = @("-s", "-E", "-I", "-m", "uvicorn", "app.main:app", "--host", $ApiHost, "--port", $port)
-      $proc = Start-LoggedProcess -Name "api" -FilePath $pythonCmd -Args $apiArgs -StdoutPath $apiStdout -StderrPath $apiStderr -WorkingDir $repoRoot -WindowStyle "Normal" -NoRedirect
+      $proc = Start-CmdProcess -Name "api" -CmdPath $pythonCmd -Arguments ($apiArgs -join " ") -WorkingDir $repoRoot
     }
     return @{ Proc = $proc; Port = $port }
   }
@@ -325,7 +347,7 @@ try {
     Write-UiConfig -RepoRoot $repoRoot -ApiBase $uiApiBase
     Write-Host "[INFO] Wrote ui\\config.js pointing to $uiApiBase" -ForegroundColor Cyan
     $uiArgs = @("-I", "-m", "http.server", "$port", "-d", "ui")
-    $proc = Start-LoggedProcess -Name "ui" -FilePath $pythonCmd -Args $uiArgs -StdoutPath $uiStdout -StderrPath $uiStderr -WorkingDir $repoRoot -WindowStyle "Normal" -NoRedirect
+    $proc = Start-CmdProcess -Name "ui" -CmdPath $pythonCmd -Arguments ($uiArgs -join " ") -WorkingDir $repoRoot
     return @{ Proc = $proc; Port = $port }
   }
   $processes += $uiResult.Proc
