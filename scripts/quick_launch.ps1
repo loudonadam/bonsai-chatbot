@@ -1,7 +1,7 @@
 param(
   [string]$ConfigFile = "config.yaml",
-  [string]$ModelPath = "models\\bonsai-gguf.gguf",
-  [string]$ServerBinary = "C:\\Users\\loudo\\Desktop\\bonsai-chatbot\\bonsai-chatbot\\scripts\\llama-server.exe",
+  [string]$ModelPath,
+  [string]$ServerBinary,
   [string]$ApiHost = "0.0.0.0",
   [int]$ApiPort = 8010,
   [int]$UiPort = 3000,
@@ -27,10 +27,27 @@ $ErrorActionPreference = "Stop"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path $scriptDir -Parent
 Set-Location $repoRoot
+$defaultModelPath = "C:\\Users\\loudo\\Desktop\\bonsai-chatbot\\bonsai-chatbot\\models\\bonsai-gguf.gguf"
+$repoModelPath = Join-Path $repoRoot "models\\bonsai-gguf.gguf"
+$defaultServerBinary = "C:\\Users\\loudo\\llama.cpp\\build\\bin\\Release\\llama-server.exe"
+$modelBasePort = 8080
+$portProbeAttempts = 20
 $dllExitHint = "Exit code -1073741515 (0xC0000135) usually means a missing DLL or blocked binary. Ensure ggml*.dll, llama.dll, mtmd.dll sit next to llama-server.exe, and right-click > Properties > Unblock. If you built llama.cpp yourself, copy everything from build\\bin\\Release next to the exe."
 
 Write-Host "[INFO] Bonsai Chatbot quick launch (single PowerShell window)" -ForegroundColor Cyan
 Write-Host "[INFO] Repo root: $repoRoot"
+if (-not $PSBoundParameters.ContainsKey("ModelPath") -or [string]::IsNullOrWhiteSpace($ModelPath)) {
+  $ModelPath = $defaultModelPath
+}
+if (-not $PSBoundParameters.ContainsKey("ServerBinary") -or [string]::IsNullOrWhiteSpace($ServerBinary)) {
+  $ServerBinary = $defaultServerBinary
+}
+if (-not (Test-Path $ModelPath) -and (Test-Path $repoModelPath)) {
+  Write-Warning "Model not found at $ModelPath. Using repo model path $repoModelPath instead."
+  $ModelPath = $repoModelPath
+}
+Write-Host "[INFO] Model path: $ModelPath"
+Write-Host "[INFO] llama-server path: $ServerBinary"
 
 $logsDir = Join-Path $repoRoot "logs"
 New-Item -ItemType Directory -Force -Path $logsDir | Out-Null
@@ -306,6 +323,10 @@ try {
     FailAndPause -Message $_.Exception.Message
   }
 
+  $modelPortToUse = $null
+  $apiPortToUse = $null
+  $uiPortToUse = $null
+
   $pythonCmd = "python"
   $venvPython = Join-Path $repoRoot ".venv\\Scripts\\python.exe"
   if (Test-Path $venvPython) {
@@ -336,24 +357,6 @@ try {
     if (-not (Test-Path $folder)) {
       Write-Host "[INFO] Creating $folder..."
       New-Item -ItemType Directory -Force -Path $folder | Out-Null
-    }
-  }
-
-  function Assert-PortAvailable {
-    param(
-      [int]$Port,
-      [string]$Name
-    )
-    $listener = $null
-    try {
-      $listener = [System.Net.Sockets.TcpListener]::Create($Port)
-      $listener.Start()
-    } catch {
-      throw "$Name port $Port is already in use. Close the existing process or rerun with a different port (ApiPort/UiPort)."
-    } finally {
-      if ($listener) {
-        $listener.Stop()
-      }
     }
   }
 
@@ -505,24 +508,24 @@ try {
         $env:PATH = "$serverDir;$($env:PATH)"
       }
 
-  $registeredDrivers = @()
-  $autoFoundIcd = $null
-  if (-not $VkIcdFilenames -and $AutoSelectAmdVkIcd) {
-    $icds = Get-VulkanDrivers
-    $registeredDrivers = $icds
-    if (-not $icds -or $icds.Count -eq 0) {
-      $autoFoundIcd = Find-AmdIcdCandidate -CandidatePaths $AmdIcdSearchPaths
-      if ($autoFoundIcd) {
-        $env:VK_ICD_FILENAMES = $autoFoundIcd
-        Write-Host "[INFO] Auto-found AMD ICD at $autoFoundIcd (filesystem search). Set -VkIcdFilenames to override." -ForegroundColor Cyan
-      } else {
-        Write-Warning "No Vulkan ICDs detected in the registry and none found on disk. If llama-server still fails, install/repair the AMD driver (Adrenalin) or pass -VkIcdFilenames to point at the AMD ICD json (e.g., C:\Windows\System32\amdvlk64.dll or Program Files\\AMD\\...\\amd_icd64.json)."
-      }
-    } elseif ($icds.Count -gt 1) {
-      $amdIcds = $icds | Where-Object { $_.Path -match "(amd|radeon|7900)" }
-      $choice = $amdIcds | Select-Object -First 1
-      if (-not $choice) {
-        # If nothing matched AMD, prefer the last entry (often the dGPU) to avoid basic/integrated ICD first.
+      $registeredDrivers = @()
+      $autoFoundIcd = $null
+      if (-not $VkIcdFilenames -and $AutoSelectAmdVkIcd) {
+        $icds = Get-VulkanDrivers
+        $registeredDrivers = $icds
+        if (-not $icds -or $icds.Count -eq 0) {
+          $autoFoundIcd = Find-AmdIcdCandidate -CandidatePaths $AmdIcdSearchPaths
+          if ($autoFoundIcd) {
+            $env:VK_ICD_FILENAMES = $autoFoundIcd
+            Write-Host "[INFO] Auto-found AMD ICD at $autoFoundIcd (filesystem search). Set -VkIcdFilenames to override." -ForegroundColor Cyan
+          } else {
+            Write-Warning "No Vulkan ICDs detected in the registry and none found on disk. If llama-server still fails, install/repair the AMD driver (Adrenalin) or pass -VkIcdFilenames to point at the AMD ICD json (e.g., C:\Windows\System32\amdvlk64.dll or Program Files\\AMD\\...\\amd_icd64.json)."
+          }
+        } elseif ($icds.Count -gt 1) {
+          $amdIcds = $icds | Where-Object { $_.Path -match "(amd|radeon|7900)" }
+          $choice = $amdIcds | Select-Object -First 1
+          if (-not $choice) {
+            # If nothing matched AMD, prefer the last entry (often the dGPU) to avoid basic/integrated ICD first.
             $choice = $icds | Select-Object -Last 1
           }
           if ($choice) {
@@ -556,26 +559,29 @@ try {
       if ($serverName -ieq "llama-cli.exe") {
         throw "ServerBinary points to llama-cli.exe, which does not support --host/--port. Please use llama-server.exe."
       }
-      $modelPortToUse = Get-AvailablePort -StartingPort 8080 -Name "Model (llama.cpp)"
-      if ($modelPortToUse -ne 8080) {
-        Write-Host "[INFO] Model port 8080 is busy. Using $modelPortToUse instead." -ForegroundColor Yellow
+      $modelPortToUse = Get-AvailablePort -StartingPort $modelBasePort -Name "Model (llama.cpp)" -MaxAttempts $portProbeAttempts
+      if ($modelPortToUse -ne $modelBasePort) {
+        Write-Host "[INFO] Model port $modelBasePort is busy. Using $modelPortToUse instead." -ForegroundColor Yellow
       }
       $llamaArgs = @("--model", $ModelPath, "--host", "127.0.0.1", "--port", "$modelPortToUse", "--ctx-size", "4096", "--n-gpu-layers", "35", "--embedding")
       $processes += Start-LoggedProcess -Name "llama-server" -FilePath $ServerBinary -Args $llamaArgs
     } elseif (-not (Test-Path $ServerBinary)) {
-      Write-Warning "llama-server.exe not found at $ServerBinary; skipping model server."
+      Write-Warning "llama-server.exe not found at $ServerBinary; skipping model server. Update -ServerBinary (or scripts\\quick_launch.bat) to point to your llama-server.exe."
     } else {
-      Write-Warning "Model file not found at $ModelPath; skipping model server."
+      Write-Warning "Model file not found at $ModelPath; skipping model server. Update -ModelPath (or scripts\\quick_launch.bat) to the correct GGUF file."
     }
   } else {
     Write-Host "[INFO] SkipModel set; not launching llama-server."
   }
 
-  Assert-PortAvailable -Port $ApiPort -Name "API"
-  $apiArgs = @("-m", "uvicorn", "app.main:app", "--host", $ApiHost, "--port", $ApiPort)
+  $apiPortToUse = Get-AvailablePort -StartingPort $ApiPort -Name "API" -MaxAttempts $portProbeAttempts
+  if ($apiPortToUse -ne $ApiPort) {
+    Write-Host "[INFO] API port $ApiPort is busy. Using $apiPortToUse instead." -ForegroundColor Yellow
+  }
+  $apiArgs = @("-m", "uvicorn", "app.main:app", "--host", $ApiHost, "--port", $apiPortToUse)
   $processes += Start-LoggedProcess -Name "api" -FilePath $pythonCmd -ArgumentList $apiArgs
 
-  $uiPortToUse = Get-AvailablePort -StartingPort $UiPort -Name "UI"
+  $uiPortToUse = Get-AvailablePort -StartingPort $UiPort -Name "UI" -MaxAttempts $portProbeAttempts
   if ($uiPortToUse -ne $UiPort) {
     Write-Host "[INFO] UI port $UiPort is busy. Using $uiPortToUse instead." -ForegroundColor Yellow
   }
@@ -588,6 +594,15 @@ try {
   }
 
   Write-Host "" 
+  if (-not $SkipModel -and $modelPortToUse) {
+    Write-Host "[INFO] Model server listening on http://127.0.0.1:$modelPortToUse" -ForegroundColor Cyan
+  }
+  if ($apiPortToUse) {
+    Write-Host "[INFO] API listening on http://$ApiHost:$apiPortToUse" -ForegroundColor Cyan
+  }
+  if ($uiPortToUse) {
+    Write-Host "[INFO] UI served at http://localhost:$uiPortToUse" -ForegroundColor Cyan
+  }
   Write-Host "[INFO] Services are running. Logs: $logsDir" -ForegroundColor Green
   Write-Host "[INFO] Press Enter to stop all processes." -ForegroundColor Yellow
   Read-Host | Out-Null
