@@ -187,6 +187,32 @@ function Start-LoggedProcess {
   return $proc
 }
 
+function Start-WithPortRetry {
+  param(
+    [string]$Name,
+    [int]$BasePort,
+    [int]$MaxAttempts,
+    [scriptblock]$StartBlock
+  )
+
+  $port = $BasePort
+  for ($i = 0; $i -lt $MaxAttempts; $i++) {
+    try {
+      $result = & $StartBlock.InvokeReturnAsIs($port)
+      return $result
+    } catch {
+      $msg = $_.Exception.Message
+      if ($msg -notmatch "bind|address.*in use|port.*in use|10048") {
+        throw
+      }
+      $nextPort = $port + 1
+      Write-Host "[WARN] $Name failed to bind to port $port. Trying $nextPort..." -ForegroundColor Yellow
+      $port = $nextPort
+    }
+  }
+  throw "No available port found for $Name starting at $BasePort (max attempts $MaxAttempts)."
+}
+
 try {
   $env:PYTHONNOUSERSITE = "1"
   $env:PYTHONSTARTUP = ""
@@ -257,22 +283,32 @@ try {
   $env:BONSAI_MODEL_API_BASE = $modelApiBase
   Write-Host "[INFO] Routing API calls to $modelApiBase (BONSAI_MODEL_API_BASE)" -ForegroundColor Cyan
 
-  $apiPort = Get-AvailablePort -StartingPort $ApiPort -MaxAttempts $MaxPortSearch -Name "API port"
-  if ($apiPort -ne $ApiPort) {
-    Write-Host "[INFO] API base port $ApiPort in use; switching to $apiPort." -ForegroundColor Yellow
+  $apiResult = Start-WithPortRetry -Name "api" -BasePort $ApiPort -MaxAttempts $MaxPortSearch -StartBlock {
+    param($port)
+    if ($port -ne $ApiPort) {
+      Write-Host "[INFO] API base port $ApiPort in use; switching to $port." -ForegroundColor Yellow
+    }
+    $apiArgs = @("-I", "-m", "uvicorn", "app.main:app", "--host", $ApiHost, "--port", $port)
+    $proc = Start-LoggedProcess -Name "api" -FilePath $pythonCmd -Args $apiArgs -StdoutPath $apiStdout -StderrPath $apiStderr -WorkingDir $repoRoot
+    return @{ Proc = $proc; Port = $port }
   }
-  $apiArgs = @("-I", "-m", "uvicorn", "app.main:app", "--host", $ApiHost, "--port", $apiPort)
-  $processes += Start-LoggedProcess -Name "api" -FilePath $pythonCmd -Args $apiArgs -StdoutPath $apiStdout -StderrPath $apiStderr -WorkingDir $repoRoot
+  $processes += $apiResult.Proc
+  $apiPort = $apiResult.Port
 
-  $uiPort = Get-AvailablePort -StartingPort $UiPort -MaxAttempts $MaxPortSearch -Name "UI port"
-  if ($uiPort -ne $UiPort) {
-    Write-Host "[INFO] UI base port $UiPort in use; switching to $uiPort." -ForegroundColor Yellow
+  $uiResult = Start-WithPortRetry -Name "ui" -BasePort $UiPort -MaxAttempts $MaxPortSearch -StartBlock {
+    param($port)
+    if ($port -ne $UiPort) {
+      Write-Host "[INFO] UI base port $UiPort in use; switching to $port." -ForegroundColor Yellow
+    }
+    $uiApiBase = "http://localhost:$apiPort"
+    Write-UiConfig -RepoRoot $repoRoot -ApiBase $uiApiBase
+    Write-Host "[INFO] Wrote ui\\config.js pointing to $uiApiBase" -ForegroundColor Cyan
+    $uiArgs = @("-I", "-m", "http.server", "$port", "-d", "ui")
+    $proc = Start-LoggedProcess -Name "ui" -FilePath $pythonCmd -Args $uiArgs -StdoutPath $uiStdout -StderrPath $uiStderr -WorkingDir $repoRoot
+    return @{ Proc = $proc; Port = $port }
   }
-  $uiApiBase = "http://localhost:$apiPort"
-  Write-UiConfig -RepoRoot $repoRoot -ApiBase $uiApiBase
-  Write-Host "[INFO] Wrote ui\\config.js pointing to $uiApiBase" -ForegroundColor Cyan
-  $uiArgs = @("-I", "-m", "http.server", "$uiPort", "-d", "ui")
-  $processes += Start-LoggedProcess -Name "ui" -FilePath $pythonCmd -Args $uiArgs -StdoutPath $uiStdout -StderrPath $uiStderr -WorkingDir $repoRoot
+  $processes += $uiResult.Proc
+  $uiPort = $uiResult.Port
 
   if (-not $NoBrowser) {
     Write-Host "[INFO] Opening browser to http://localhost:$uiPort"
