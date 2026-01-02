@@ -51,6 +51,12 @@ class LlamaCPPClient:
                 return content
             logger.warning("Chat completion payload missing content; retrying with /completions")
         except httpx.HTTPStatusError as exc:
+            if exc.response.status_code in (400, 404) and "model not found" in exc.response.text.lower():
+                detail = (
+                    "Model not found on llama.cpp. Make sure llama-server.exe is started with "
+                    f"--model <path> --alias {self.model_name} (or update config.model.name to the alias you use)."
+                )
+                raise HTTPException(status_code=400, detail=detail) from exc
             if exc.response.status_code not in (400, 404):
                 raise HTTPException(
                     status_code=exc.response.status_code,
@@ -77,6 +83,12 @@ class LlamaCPPClient:
                 )
             return content
         except httpx.HTTPStatusError as exc:
+            if exc.response.status_code in (400, 404) and "model not found" in exc.response.text.lower():
+                detail = (
+                    "Model not found on llama.cpp (fallback). Start llama-server.exe with "
+                    f"--model <path> --alias {self.model_name} and keep config.model.name in sync."
+                )
+                raise HTTPException(status_code=400, detail=detail) from exc
             raise HTTPException(
                 status_code=exc.response.status_code,
                 detail=f"Model call failed after fallback: {exc}. Response: {exc.response.text}",

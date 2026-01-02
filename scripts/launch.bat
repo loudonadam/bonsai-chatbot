@@ -8,6 +8,7 @@ REM --- user settings ------------------------------------------------------
 set CONFIG_FILE=config.yaml
 set MODEL_PATH=models\bonsai-gguf.gguf
 set SERVER_BIN=C:\Users\loudo\llama.cpp\build\bin\Release\llama-server.exe
+set MODEL_ALIAS=local-llm
 set API_HOST=0.0.0.0
 set API_PORT=8010
 set UI_PORT=3000
@@ -47,8 +48,8 @@ if exist "%SERVER_BIN%" (
     echo [ERROR] Model file not found at %MODEL_PATH%.
     echo Update MODEL_PATH in launch.bat or config.yaml.
   ) else (
-    echo [INFO] Launching %SERVER_BIN% with model %MODEL_PATH%...
-    start "llama" cmd /k "\"%SERVER_BIN%\" --model \"%MODEL_PATH%\" --host 127.0.0.1 --port 8080 --ctx-size 4096 --n-gpu-layers 35 --embedding || (echo llama-server exited with error & pause)"
+    echo [INFO] Launching %SERVER_BIN% with model %MODEL_PATH% (alias=%MODEL_ALIAS%)...
+    start "llama" cmd /k "\"%SERVER_BIN%\" --model \"%MODEL_PATH%\" --alias \"%MODEL_ALIAS%\" --no-router --host 127.0.0.1 --port 8080 --ctx-size 4096 --n-gpu-layers 35 --embedding || (echo llama-server exited with error & pause)"
   )
 ) else (
   echo [INFO] Skipping llama-server auto-start (place llama-server.exe in scripts\ or run scripts\start_model.bat manually).

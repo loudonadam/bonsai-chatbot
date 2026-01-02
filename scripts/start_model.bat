@@ -5,6 +5,7 @@ REM Update the model path to your GGUF file (relative to repo root by default)
 set MODEL_PATH=%~dp0..\models\bonsai-gguf.gguf
 REM IMPORTANT: use llama-server.exe (llama-cli.exe does not support --host/--port)
 set SERVER_BIN=C:\Users\loudo\llama.cpp\build\bin\Release\llama-server.exe
+set MODEL_ALIAS=local-llm
 set BASE_PORT=8080
 set MAX_PORT_SEARCH=20
 set LOGS_DIR=%~dp0..\logs
@@ -76,7 +77,7 @@ echo   %STDOUT_LOG%
 echo   %STDERR_LOG%
 echo.
 
-"%SERVER_BIN%" --model "%MODEL_PATH%" --host 127.0.0.1 --port %PORT% --ctx-size 4096 --n-gpu-layers -1 --embedding 1>>"%STDOUT_LOG%" 2>>"%STDERR_LOG%"
+"%SERVER_BIN%" --model "%MODEL_PATH%" --alias "%MODEL_ALIAS%" --no-router --host 127.0.0.1 --port %PORT% --ctx-size 4096 --n-gpu-layers -1 --embedding 1>>"%STDOUT_LOG%" 2>>"%STDERR_LOG%"
 
 if %errorlevel% neq 0 (
   echo llama-server exited with error level %errorlevel%. Review the log files above for details.
