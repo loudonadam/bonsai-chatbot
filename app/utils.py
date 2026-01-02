@@ -20,15 +20,14 @@ def chunk_text(text: str, chunk_size: int, chunk_overlap: int) -> List[str]:
     if chunk_overlap >= chunk_size:
         raise ValueError("chunk_overlap must be smaller than chunk_size to avoid infinite loops")
 
-    words = text.split()
+    sanitized = " ".join(text.split())
+    words = sanitized.split()
     chunks: List[str] = []
     start = 0
     while start < len(words):
         end = min(len(words), start + chunk_size)
         chunks.append(" ".join(words[start:end]))
-        if end == len(words):
+        if end >= len(words):
             break
-        start = end - chunk_overlap
-        if start < 0:
-            start = 0
+        start = max(0, end - chunk_overlap)
     return chunks
