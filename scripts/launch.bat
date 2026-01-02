@@ -7,7 +7,7 @@ pushd "%~dp0.."
 REM --- user settings ------------------------------------------------------
 set CONFIG_FILE=config.yaml
 set MODEL_PATH=models\bonsai-gguf.gguf
-set SERVER_BIN=scripts\llama-server.exe
+set SERVER_BIN=C:\Users\loudo\Desktop\src\llama.cpp\build\bin\Release\llama-server.exe
 set API_HOST=0.0.0.0
 set API_PORT=8010
 set UI_PORT=3000

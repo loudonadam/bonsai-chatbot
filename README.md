@@ -42,15 +42,15 @@ Everything else is scripted for one-click launch on Windows.
    ```
    Then set:
    - `model.path`: path to your GGUF (e.g., `C:\models\llama3-8b-q4.gguf` or keep `models\bonsai-gguf.gguf`).
-   - `model.server_binary`: path to your `llama-server.exe` (keep it beside its DLLs). Default points to `scripts\llama-server.exe`.
+   - `model.server_binary`: path to your `llama-server.exe` (keep it beside its DLLs). Default is `C:\Users\loudo\Desktop\src\llama.cpp\build\bin\Release\llama-server.exe`.
    - `model.name`: model identifier llama.cpp should expose (default `local-llm`).
    - `model.timeout_seconds`: request timeout; extend if your GPU warm-up is slow.
    - If you must stay offline, set `embedding.local_files_only: true` and point `embedding.model` to a local folder; otherwise the embedding model downloads on first ingest.
 
 4) **Place model + llama.cpp server**
    - Drop your **GGUF** under `models\` (or anywhere, then update `config.yaml` or pass `-ModelPath` to quick launch).
-   - Copy your **llama-server.exe** (plus its DLLs like `ggml*.dll`, `llama.dll`, `mtmd.dll`, Vulkan DLLs) into `scripts\` **or** leave it elsewhere and update `model.server_binary`.
-   - Optional sanity check: from the repo root, run `scripts\llama-server.exe --version` to confirm DLLs load.
+   - Keep your **llama-server.exe** (plus its DLLs like `ggml*.dll`, `llama.dll`, `mtmd.dll`, Vulkan DLLs) at `C:\Users\loudo\Desktop\src\llama.cpp\build\bin\Release\llama-server.exe` (default). If you move it, update `model.server_binary` and the scripts.
+   - Optional sanity check: from PowerShell, run `& 'C:\Users\loudo\Desktop\src\llama.cpp\build\bin\Release\llama-server.exe' --version` to confirm DLLs load.
 
 5) **Add your bonsai sources**
    - Place trusted `.txt` or `.md` files in `data\raw`. The folder is created automatically if missing.
