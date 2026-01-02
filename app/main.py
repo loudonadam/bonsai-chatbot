@@ -50,6 +50,45 @@ def build_llm_client(config: AppConfig) -> LlamaCPPClient:
     )
 
 
+async def verify_llama_server(client: httpx.AsyncClient, llm: LlamaCPPClient) -> None:
+    """
+    Detect the common router-mode / no-model issue up front.
+    If /v1/models exists and shows zero or missing models, raise a clear error.
+    """
+    try:
+        resp = await client.get(f"{llm.api_base}/models")
+    except httpx.HTTPError:
+        # Connection errors are handled later when we actually call the model.
+        return
+
+    # Older llama.cpp builds may not implement /models; tolerate 404.
+    if resp.status_code == 404:
+        return
+
+    try:
+        resp.raise_for_status()
+    except httpx.HTTPStatusError:
+        return
+
+    try:
+        payload = resp.json()
+    except Exception:
+        return
+
+    models = {m.get("id") for m in payload.get("data", []) if isinstance(m, dict)}
+    if not models:
+        raise RuntimeError(
+            "llama.cpp is running without a loaded model (router mode). "
+            f"Start llama-server.exe with --model <path> --alias {llm.model_name} --no-router, "
+            "and stop any existing router-mode llama-server on the same port."
+        )
+    if llm.model_name not in models:
+        raise RuntimeError(
+            f"llama.cpp is serving models {sorted(models)}, but config.model.name is '{llm.model_name}'. "
+            "Restart llama-server.exe with matching --alias, or update config.model.name."
+        )
+
+
 def get_app(config_path: pathlib.Path = pathlib.Path("config.yaml")) -> FastAPI:
     config = load_config(config_path)
     config.ensure_data_dirs()
@@ -60,6 +99,7 @@ def get_app(config_path: pathlib.Path = pathlib.Path("config.yaml")) -> FastAPI:
     async def lifespan(_: FastAPI):
         async with httpx.AsyncClient(timeout=config.model.timeout_seconds) as client:
             app.state.http_client = client
+            await verify_llama_server(client, llama_client)
             yield
         app.state.http_client = None
 

@@ -1,9 +1,13 @@
 import logging
+import os
 import pathlib
 from dataclasses import dataclass
 from functools import lru_cache
 from threading import Lock
 from typing import List, Optional, Sequence
+
+# Silence Chroma telemetry warnings/errors in constrained environments.
+os.environ.setdefault("CHROMA_TELEMETRY_ENABLED", "false")
 
 import chromadb
 from chromadb.api.types import Documents, EmbeddingFunction, Embeddings, Metadatas
