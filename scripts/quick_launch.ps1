@@ -17,7 +17,7 @@ $repoRoot = Split-Path $scriptDir -Parent
 Set-Location $repoRoot
 
 $defaultModelPath = Join-Path $repoRoot "models\bonsai-gguf.gguf"
-$defaultServerBinary = "C:\Users\loudo\Desktop\src\llama.cpp\build\bin\Release\llama-server.exe"
+$defaultServerBinary = "C:\Users\loudo\llama.cpp\build\bin\Release\llama-server.exe"
 $logsDir = Join-Path $repoRoot "logs"
 $modelStdout = Join-Path $logsDir "llama-server-stdout.log"
 $modelStderr = Join-Path $logsDir "llama-server-stderr.log"

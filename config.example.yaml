@@ -1,6 +1,6 @@
 model:
   path: "models/bonsai-gguf.gguf"           # Path to your GGUF model file
-  server_binary: "C:\\Users\\loudo\\Desktop\\src\\llama.cpp\\build\\bin\\Release\\llama-server.exe" # Path to llama.cpp's llama-server.exe (optional helper)
+  server_binary: "C:\\Users\\loudo\\llama.cpp\\build\\bin\\Release\\llama-server.exe" # Path to llama.cpp's llama-server.exe (optional helper)
   api_base: "http://127.0.0.1:8080/v1"      # llama.cpp server URL (OpenAI-compatible)
   name: "local-llm"                         # Passed to llama.cpp's OpenAI-compatible API
   max_tokens: 512
