@@ -64,7 +64,7 @@ Everything else is scripted for one-click launch on Windows.
    - Double-click `scripts\quick_launch.bat` (or right-click > Run with PowerShell).
    - What happens:
      - Checks for `config.yaml`, the model, and `llama-server.exe` (if configured to start it).
-     - Starts `llama-server.exe` on port **8080** (skips if unavailable), the FastAPI backend on **8010**, and a static UI server on **3000** (auto-picks another UI port if 3000 is busy).
+     - Starts `llama-server.exe` on port **8080** with `--alias local-llm --no-router` (skips if unavailable), the FastAPI backend on **8010**, and a static UI server on **3000** (auto-picks another UI port if 3000 is busy).
      - Opens your browser to the chat UI.
      - Writes logs to `logs\llama-server-*.log`, `logs\api-*.log`, and `logs\ui-*.log`.
    - Press **Enter** in that window to stop everything cleanly.
@@ -76,6 +76,11 @@ Everything else is scripted for one-click launch on Windows.
 - Use the **Vulkan build** of llama.cpp and keep Vulkan runtime updated (AMD drivers include it).
 - If llama.cpp lists multiple devices (e.g., iGPU + dGPU), `quick_launch.ps1` auto-picks a GPU whose name matches `"7900"`; override with `-VulkanDevice <index>` in PowerShell if needed.
 - Lower `--gpu-layers` if you see OOM; raise it to move more work to the GPU for faster responses.
+
+## Troubleshooting “model not found” or router-mode logs
+- If `llama-server-stderr.log` mentions “router server” or “no model will be loaded”, an old llama-server process is running in router mode (no `--model`). Stop it (close the window or kill the process), then re-run `scripts\quick_launch.bat` or `scripts\start_model.bat` so it launches with `--model ... --alias local-llm --no-router`.
+- Ensure `config.model.name` matches the alias you pass to llama.cpp (`local-llm` by default). If you change one, change the other.
+- Confirm the model path exists and is readable at `config.model.path` (or the `-ModelPath` you pass to quick_launch).
 
 ## Manual commands (optional)
 - Rebuild index: `python -m app.ingest --config config.yaml`

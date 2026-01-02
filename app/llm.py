@@ -53,8 +53,9 @@ class LlamaCPPClient:
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code in (400, 404) and "model not found" in exc.response.text.lower():
                 detail = (
-                    "Model not found on llama.cpp. Make sure llama-server.exe is started with "
-                    f"--model <path> --alias {self.model_name} (or update config.model.name to the alias you use)."
+                    "Model not found on llama.cpp. Start llama-server.exe with "
+                    f"--model <path> --alias {self.model_name} --no-router "
+                    "(or update config.model.name to the alias you use), and stop any router-mode server already running."
                 )
                 raise HTTPException(status_code=400, detail=detail) from exc
             if exc.response.status_code not in (400, 404):
@@ -86,7 +87,8 @@ class LlamaCPPClient:
             if exc.response.status_code in (400, 404) and "model not found" in exc.response.text.lower():
                 detail = (
                     "Model not found on llama.cpp (fallback). Start llama-server.exe with "
-                    f"--model <path> --alias {self.model_name} and keep config.model.name in sync."
+                    f"--model <path> --alias {self.model_name} --no-router "
+                    "and keep config.model.name in sync; also stop any router-mode server already running."
                 )
                 raise HTTPException(status_code=400, detail=detail) from exc
             raise HTTPException(
