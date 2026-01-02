@@ -1,56 +1,36 @@
 import argparse
 import pathlib
-from dataclasses import dataclass
-from typing import Any, Dict
 
-import yaml
-
-from app import rag
-
-
-@dataclass
-class AppConfig:
-    model: Dict[str, Any]
-    server: Dict[str, Any]
-    ui: Dict[str, Any]
-    embedding: Dict[str, Any]
-    retrieval: Dict[str, Any]
-    data: Dict[str, Any]
-
-    @staticmethod
-    def load(path: pathlib.Path) -> "AppConfig":
-        with path.open("r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-        return AppConfig(**data)
+from app.config import AppConfig
+from app.rag import RAGConfig, RAGPipeline
 
 
 def run_ingest(config_path: pathlib.Path) -> int:
-    app_config = AppConfig.load(config_path)
-    raw_dir = pathlib.Path(app_config.data["raw_dir"])
-    index_dir = pathlib.Path(app_config.data["index_dir"])
-    raw_dir.mkdir(parents=True, exist_ok=True)
-    index_dir.mkdir(parents=True, exist_ok=True)
+    config = AppConfig.load(config_path)
+    config.ensure_data_dirs()
 
-    cache_dir = app_config.embedding.get("cache_dir")
-
-    rag_config = rag.RAGConfig(
-        index_dir=index_dir,
-        embedding_model=app_config.embedding["model"],
-        device=app_config.embedding.get("device", "cpu"),
-        chunk_size=int(app_config.retrieval.get("chunk_size", 800)),
-        chunk_overlap=int(app_config.retrieval.get("chunk_overlap", 120)),
-        top_k=int(app_config.retrieval.get("k", 4)),
-        cache_dir=pathlib.Path(cache_dir) if cache_dir else None,
-        local_files_only=bool(app_config.embedding.get("local_files_only", False)),
+    rag_config = RAGConfig(
+        index_dir=pathlib.Path(config.data.index_dir),
+        embedding_model=config.embedding.model,
+        device=config.embedding.device,
+        chunk_size=config.retrieval.chunk_size,
+        chunk_overlap=config.retrieval.chunk_overlap,
+        top_k=config.retrieval.k,
+        cache_dir=pathlib.Path(config.embedding.cache_dir) if config.embedding.cache_dir else None,
+        local_files_only=config.embedding.local_files_only,
     )
-
-    count = rag.ingest_directory(rag_config, raw_dir)
-    return count
+    pipeline = RAGPipeline(rag_config)
+    return pipeline.rebuild(pathlib.Path(config.data.raw_dir))
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Ingest bonsai documents")
-    parser.add_argument("--config", type=pathlib.Path, default=pathlib.Path("config.yaml"))
+    parser = argparse.ArgumentParser(description="Ingest bonsai documents into the vector store.")
+    parser.add_argument(
+        "--config",
+        type=pathlib.Path,
+        default=pathlib.Path("config.yaml"),
+        help="Path to config YAML (default: config.yaml)",
+    )
     args = parser.parse_args()
 
     try:
@@ -58,6 +38,7 @@ def main() -> None:
     except ValueError as exc:
         parser.error(str(exc))
         return
+
     print(f"Ingested {count} chunks into the index.")
 
 

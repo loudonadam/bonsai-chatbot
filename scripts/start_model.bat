@@ -1,10 +1,10 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
-REM Update the model path to your GGUF file
-set MODEL_PATH=C:\Users\loudo\Desktop\bonsai-chatbot\bonsai-chatbot\models\bonsai-gguf.gguf
+REM Update the model path to your GGUF file (relative to repo root by default)
+set MODEL_PATH=%~dp0..\models\bonsai-gguf.gguf
 REM IMPORTANT: use llama-server.exe (llama-cli.exe does not support --host/--port)
-set SERVER_BIN=C:\Users\loudo\llama.cpp\build\bin\Release\llama-server.exe
+set SERVER_BIN=%~dp0llama-server.exe
 set BASE_PORT=8080
 set MAX_PORT_SEARCH=20
 set LOGS_DIR=%~dp0..\logs
