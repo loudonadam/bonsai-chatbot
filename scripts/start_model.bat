@@ -1,7 +1,11 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
+<<<<<<< Updated upstream
 REM Update the model path to your GGUF file
+=======
+REM Update the model path to your GGUF file (relative to repo root by default)
+>>>>>>> Stashed changes
 set MODEL_PATH=C:\Users\loudo\Desktop\bonsai-chatbot\bonsai-chatbot\models\bonsai-gguf.gguf
 REM IMPORTANT: use llama-server.exe (llama-cli.exe does not support --host/--port)
 set SERVER_BIN=C:\Users\loudo\llama.cpp\build\bin\Release\llama-server.exe
@@ -11,7 +15,7 @@ set LOGS_DIR=%~dp0..\logs
 set STDOUT_LOG=%LOGS_DIR%\llama-server-stdout.log
 set STDERR_LOG=%LOGS_DIR%\llama-server-stderr.log
 rem If you have both an iGPU and dGPU and want to force one, set VULKAN_DEVICE to a 0-based index (leave blank to let llama.cpp decide).
-set VULKAN_DEVICE=
+set VULKAN_DEVICE=0
 rem Optional: restrict visible Vulkan ICDs (semicolon-separated paths to .json ICD files, often under C:\Windows\System32\DriverStore\FileRepository\*\*.json).
 set VULKAN_ICD_FILENAMES=
 
@@ -76,7 +80,12 @@ echo   %STDOUT_LOG%
 echo   %STDERR_LOG%
 echo.
 
+<<<<<<< Updated upstream
 "%SERVER_BIN%" --model "%MODEL_PATH%" --host 127.0.0.1 --port %PORT% --ctx-size 4096 --n-gpu-layers -1 --embedding 1>>"%STDOUT_LOG%" 2>>"%STDERR_LOG%"
+=======
+"%SERVER_BIN%" --model "%MODEL_PATH%" --alias "%MODEL_ALIAS%" --host 127.0.0.1 --port %PORT% --ctx-size 4096 --n-gpu-layers -1 --embedding 1>>"%STDOUT_LOG%" 2>>"%STDERR_LOG%"
+
+>>>>>>> Stashed changes
 
 if %errorlevel% neq 0 (
   echo llama-server exited with error level %errorlevel%. Review the log files above for details.

@@ -1,8 +1,0 @@
-﻿2025-12-30 00:58:47	llama-server self-test (--version) failed. Exit code: -1. Output:
-version: 7556 (4fd59e842)
-Exit code -1073741515 (0xC0000135) usually means a missing DLL or blocked binary. Ensure ggml*.dll, llama.dll, mtmd.dll sit next to llama-server.exe, and right-click > Properties > Unblock. If you built llama.cpp yourself, copy everything from build\\bin\\Release next to the exe.
-Diagnostics written to C:\Users\loudo\Desktop\bonsai-chatbot\bonsai-chatbot\logs\quick-launch-vulkan.log
-2025-12-30 01:04:45	llama-server self-test (--version) failed. Exit code: -1. Output:
-version: 7556 (4fd59e842)
-Exit code -1073741515 (0xC0000135) usually means a missing DLL or blocked binary. Ensure ggml*.dll, llama.dll, mtmd.dll sit next to llama-server.exe, and right-click > Properties > Unblock. If you built llama.cpp yourself, copy everything from build\\bin\\Release next to the exe.
-Diagnostics written to C:\Users\loudo\Desktop\bonsai-chatbot\bonsai-chatbot\logs\quick-launch-vulkan.log

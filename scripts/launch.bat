@@ -47,8 +47,13 @@ if exist "%SERVER_BIN%" (
     echo [ERROR] Model file not found at %MODEL_PATH%.
     echo Update MODEL_PATH in launch.bat or config.yaml.
   ) else (
+<<<<<<< Updated upstream
     echo [INFO] Launching %SERVER_BIN% with model %MODEL_PATH%...
     start "llama" cmd /k "\"%SERVER_BIN%\" --model \"%MODEL_PATH%\" --host 127.0.0.1 --port 8080 --ctx-size 4096 --n-gpu-layers 35 --embedding || (echo llama-server exited with error & pause)"
+=======
+    echo [INFO] Launching %SERVER_BIN% with model %MODEL_PATH% (alias=%MODEL_ALIAS%)...
+    start "llama" cmd /k "\"%SERVER_BIN%\" --model \"%MODEL_PATH%\" --alias \"%MODEL_ALIAS%\" --host 127.0.0.1 --port 8080 --ctx-size 4096 --n-gpu-layers 35 --embedding || (echo llama-server exited with error & pause)"
+>>>>>>> Stashed changes
   )
 ) else (
   echo [INFO] Skipping llama-server auto-start (place llama-server.exe in scripts\ or run scripts\start_model.bat manually).

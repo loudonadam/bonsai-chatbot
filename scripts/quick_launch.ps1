@@ -225,6 +225,39 @@ function Start-WithPortRetry {
     [scriptblock]$StartBlock
   )
 
+  function Wait-ForModelReady {
+  param(
+    [string]$ModelUrl,
+    [int]$TimeoutSeconds = 60
+  )
+  
+  Write-Host "[INFO] Waiting for model server to be ready at $ModelUrl..." -ForegroundColor Yellow
+  $startTime = Get-Date
+  $ready = $false
+  
+  while (-not $ready) {
+    $elapsed = (Get-Date) - $startTime
+    if ($elapsed.TotalSeconds -gt $TimeoutSeconds) {
+      throw "Model server did not become ready within $TimeoutSeconds seconds. Check logs: $logsDir"
+    }
+    
+    try {
+      $response = Invoke-WebRequest -Uri "$ModelUrl/models" -Method Get -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
+      if ($response.StatusCode -eq 200) {
+        $content = $response.Content | ConvertFrom-Json
+        if ($content.data -and $content.data.Count -gt 0) {
+          $ready = $true
+          Write-Host "[INFO] Model server ready! Loaded model: $($content.data[0].id)" -ForegroundColor Green
+        }
+      }
+    } catch {
+      # Server not ready yet, keep waiting
+      Start-Sleep -Seconds 2
+      Write-Host "." -NoNewline -ForegroundColor Yellow
+    }
+  }
+}
+
   $port = $BasePort
   for ($i = 0; $i -lt $MaxAttempts; $i++) {
     try {
@@ -305,7 +338,6 @@ try {
     $modelArgs = @(
       "--model", $ModelPath,
       "--alias", "local-llm",
-      "--no-router",
       "--host", "127.0.0.1",
       "--port", "$modelPort",
       "--ctx-size", "4096",
@@ -314,6 +346,8 @@ try {
     )
     $processes += Start-LoggedProcess -Name "llama-server" -FilePath $ServerBinary -Args $modelArgs -StdoutPath $modelStdout -StderrPath $modelStderr -WorkingDir $repoRoot
     $modelApiBase = "http://127.0.0.1:$modelPort/v1"
+    # Wait for model to fully load before starting API
+    Wait-ForModelReady -ModelUrl $modelApiBase -TimeoutSeconds 90
   } else {
     Write-Host "[INFO] SkipModel set; not launching llama-server."
   }

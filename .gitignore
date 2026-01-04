@@ -7,3 +7,5 @@ data/index/
 ui/__pycache__/
 logs/quick-launch-error.log
 /logs
+logs/api-stderr.log
+logs/api-stdout.log
