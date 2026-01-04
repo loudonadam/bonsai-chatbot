@@ -2,77 +2,108 @@ import asyncio
 import logging
 import pathlib
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
-import os
-import json
+from typing import Dict, List
 
 import httpx
-import yaml
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from app import rag
+from app.config import AppConfig
+from app.llm import LlamaCPPClient
+from app.rag import RAGConfig, RAGPipeline
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class AppConfig:
-    model: Dict[str, Any]
-    server: Dict[str, Any]
-    ui: Dict[str, Any]
-    embedding: Dict[str, Any]
-    retrieval: Dict[str, Any]
-    data: Dict[str, Any]
+def load_config(config_path: pathlib.Path) -> AppConfig:
+    if not config_path.exists():
+        raise RuntimeError(
+            f"Config file not found at {config_path}. Copy config.example.yaml to config.yaml and update paths."
+        )
+    return AppConfig.load(config_path)
 
-    @staticmethod
-    def load(path: pathlib.Path) -> "AppConfig":
-        with path.open("r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
 
-        # Allow quick launch scripts to override the model API base without touching the YAML
-        env_api_base = os.getenv("BONSAI_MODEL_API_BASE")
-        if env_api_base:
-            data.setdefault("model", {})
-            data["model"]["api_base"] = env_api_base
+def build_pipeline(config: AppConfig) -> RAGPipeline:
+    rag_config = RAGConfig(
+        index_dir=pathlib.Path(config.data.index_dir),
+        embedding_model=config.embedding.model,
+        device=config.embedding.device,
+        chunk_size=config.retrieval.chunk_size,
+        chunk_overlap=config.retrieval.chunk_overlap,
+        top_k=config.retrieval.k,
+        cache_dir=pathlib.Path(config.embedding.cache_dir) if config.embedding.cache_dir else None,
+        local_files_only=config.embedding.local_files_only,
+    )
+    pipeline = RAGPipeline(rag_config)
+    pipeline.prime()
+    return pipeline
 
-        return AppConfig(**data)
+
+def build_llm_client(config: AppConfig) -> LlamaCPPClient:
+    return LlamaCPPClient(
+        api_base=config.model.api_base,
+        model_name=config.model.name,
+        max_tokens=config.model.max_tokens,
+        temperature=config.model.temperature,
+        timeout_seconds=config.model.timeout_seconds if hasattr(config.model, "timeout_seconds") else 120,
+    )
+
+
+async def verify_llama_server(client: httpx.AsyncClient, llm: LlamaCPPClient) -> None:
+    """
+    Detect the common router-mode / no-model issue up front.
+    If /v1/models exists and shows zero or missing models, raise a clear error.
+    """
+    try:
+        resp = await client.get(f"{llm.api_base}/models")
+    except httpx.HTTPError:
+        # Connection errors are handled later when we actually call the model.
+        return
+
+    # Older llama.cpp builds may not implement /models; tolerate 404.
+    if resp.status_code == 404:
+        return
+
+    try:
+        resp.raise_for_status()
+    except httpx.HTTPStatusError:
+        return
+
+    try:
+        payload = resp.json()
+    except Exception:
+        return
+
+    models = {m.get("id") for m in payload.get("data", []) if isinstance(m, dict)}
+    if not models:
+        raise RuntimeError(
+            "llama.cpp is running without a loaded model (router mode). "
+            f"Start llama-server.exe with --model <path> --alias {llm.model_name} --no-router, "
+            "and stop any existing router-mode llama-server on the same port."
+        )
+    if llm.model_name not in models:
+        raise RuntimeError(
+            f"llama.cpp is serving models {sorted(models)}, but config.model.name is '{llm.model_name}'. "
+            "Restart llama-server.exe with matching --alias, or update config.model.name."
+        )
 
 
 def get_app(config_path: pathlib.Path = pathlib.Path("config.yaml")) -> FastAPI:
-    app_config = AppConfig.load(config_path)
-
-    index_dir = pathlib.Path(app_config.data["index_dir"])
-    raw_dir = pathlib.Path(app_config.data["raw_dir"])
-    index_dir.mkdir(parents=True, exist_ok=True)
-    raw_dir.mkdir(parents=True, exist_ok=True)
-
-    cache_dir = app_config.embedding.get("cache_dir")
-
-    rag_config = rag.RAGConfig(
-        index_dir=index_dir,
-        embedding_model=app_config.embedding["model"],
-        device=app_config.embedding.get("device", "cpu"),
-        chunk_size=int(app_config.retrieval.get("chunk_size", 800)),
-        chunk_overlap=int(app_config.retrieval.get("chunk_overlap", 120)),
-        top_k=int(app_config.retrieval.get("k", 4)),
-        cache_dir=pathlib.Path(cache_dir) if cache_dir else None,
-        local_files_only=bool(app_config.embedding.get("local_files_only", False)),
-    )
-    rag_service = rag.RAGService(rag_config)
+    config = load_config(config_path)
+    config.ensure_data_dirs()
+    rag_pipeline = build_pipeline(config)
+    llama_client = build_llm_client(config)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
-        rag_service.prime()
-        client_timeout = app_config.model.get("timeout_seconds", 120)
-        async with httpx.AsyncClient(timeout=client_timeout) as client:
+        async with httpx.AsyncClient(timeout=config.model.timeout_seconds) as client:
             app.state.http_client = client
+            await verify_llama_server(client, llama_client)
             yield
         app.state.http_client = None
 
-    app = FastAPI(title="Bonsai Chatbot API", version="1.0", lifespan=lifespan)
+    app = FastAPI(title="Bonsai Chatbot API", version="2.0", lifespan=lifespan)
 
     app.add_middleware(
         CORSMiddleware,
@@ -89,87 +120,8 @@ def get_app(config_path: pathlib.Path = pathlib.Path("config.yaml")) -> FastAPI:
         answer: str
         sources: List[Dict[str, str]]
 
-    async def _call_llm(prompt: str) -> str:
-        api_base = app_config.model.get("api_base", "http://127.0.0.1:8080/v1")
-        model_name = app_config.model.get("name", "local-llm")
-        max_tokens = app_config.model.get("max_tokens", 512)
-        temperature = app_config.model.get("temperature", 0.7)
-
-        chat_body = {
-            "model": model_name,
-            "messages": [
-                {"role": "system", "content": "You are a helpful bonsai assistant."},
-                {"role": "user", "content": prompt},
-            ],
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "stream": False,
-        }
-
-        def _extract_chat_content(payload: Dict[str, Any]) -> Optional[str]:
-            return payload.get("choices", [{}])[0].get("message", {}).get("content")
-
-        def _extract_completion_content(payload: Dict[str, Any]) -> Optional[str]:
-            return payload.get("choices", [{}])[0].get("text")
-
-        client: Optional[httpx.AsyncClient] = getattr(app.state, "http_client", None)
-        if client is None:
-            raise HTTPException(
-                status_code=500,
-                detail="HTTP client not initialized; FastAPI lifespan may not have started.",
-            )
-
-        try:
-            resp = await client.post(f"{api_base}/chat/completions", json=chat_body)
-            resp.raise_for_status()
-            data = resp.json()
-            content = _extract_chat_content(data)
-            if content:
-                return content
-            logger.warning("Empty chat completion content; falling back to /v1/completions")
-        except httpx.HTTPStatusError as exc:
-            # Common on router builds without chat support or when model name mismatches
-            resp_text = exc.response.text
-            if exc.response.status_code in (400, 404):
-                logger.warning(
-                    "Chat completion failed (%s). Falling back to /v1/completions. Body: %s",
-                    exc.response.status_code,
-                    resp_text,
-                )
-            else:
-                raise HTTPException(
-                    status_code=exc.response.status_code,
-                    detail=f"Model call failed: {exc}. Response: {resp_text}",
-                ) from exc
-        except Exception as exc:  # pragma: no cover - runtime guardrail
-            raise HTTPException(status_code=500, detail=f"Model call failed: {exc}") from exc
-
-        # Fallback: /v1/completions for older llama.cpp servers or missing chat support
-        completion_body = {
-            "model": model_name,
-            "prompt": prompt,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "stream": False,
-        }
-        try:
-            resp = await client.post(f"{api_base}/completions", json=completion_body)
-            resp.raise_for_status()
-            data = resp.json()
-            content = _extract_completion_content(data)
-            if not content:
-                raise HTTPException(
-                    status_code=500,
-                    detail="Empty response from model after fallback to /v1/completions",
-                )
-            return content
-        except httpx.HTTPStatusError as exc:
-            raise HTTPException(
-                status_code=exc.response.status_code,
-                detail=f"Model call failed after fallback: {exc}. Response: {exc.response.text}",
-            ) from exc
-        except Exception as exc:  # pragma: no cover - runtime guardrail
-            raise HTTPException(status_code=500, detail=f"Model call failed after fallback: {exc}")
+    class IngestResponse(BaseModel):
+        chunks: int
 
     @app.get("/health")
     async def health() -> Dict[str, str]:
@@ -177,39 +129,36 @@ def get_app(config_path: pathlib.Path = pathlib.Path("config.yaml")) -> FastAPI:
 
     @app.post("/ask", response_model=AskResponse)
     async def ask(payload: AskRequest):
-        try:
-            hits = rag_service.retrieve(payload.question)
-            if not hits:
-                logger.warning("No retrieval results for query: %s", payload.question)
-        except RuntimeError as exc:
-            raise HTTPException(status_code=500, detail=str(exc))
-        prompt = rag.build_prompt(payload.question, hits)
+        hits = rag_pipeline.retrieve(payload.question)
+        prompt = rag_pipeline.build_prompt(payload.question, hits)
+
+        client: httpx.AsyncClient = getattr(app.state, "http_client", None)
+        if client is None:
+            raise HTTPException(status_code=500, detail="HTTP client not initialized.")
 
         try:
-            content = await _call_llm(prompt)
-        except httpx.ConnectError as exc:  # pragma: no cover - runtime errors reported to user
-            api_base = app_config.model.get("api_base", "http://127.0.0.1:8080/v1")
-            hint = (
-                f"Failed to reach LLM server at {api_base}. "
-                "Make sure llama.cpp is running (e.g., scripts/start_model.bat) "
-                "and that config.model.api_base matches the server URL."
-            )
-            raise HTTPException(status_code=502, detail=hint) from exc
+            content = await llama_client.generate(prompt, client)
+        except httpx.ConnectError as exc:  # pragma: no cover - runtime guardrail
+            raise HTTPException(
+                status_code=502,
+                detail=(
+                    f"Failed to reach llama.cpp at {llama_client.api_base}. "
+                    "Ensure llama-server.exe is running and config.model.api_base matches."
+                ),
+            ) from exc
 
         return AskResponse(answer=content.strip(), sources=list(hits))
-
-    class IngestResponse(BaseModel):
-        chunks: int
 
     @app.post("/ingest", response_model=IngestResponse)
     async def ingest():
         loop = asyncio.get_event_loop()
         try:
-            count = await loop.run_in_executor(None, rag_service.ingest_directory, raw_dir)
+            count = await loop.run_in_executor(None, rag_pipeline.rebuild, pathlib.Path(config.data.raw_dir))
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
         except Exception as exc:  # pragma: no cover - runtime guardrail
             raise HTTPException(status_code=500, detail=f"Ingestion failed: {exc}")
+
         return IngestResponse(chunks=count)
 
     return app

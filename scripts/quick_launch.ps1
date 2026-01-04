@@ -16,7 +16,7 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Split-Path $scriptDir -Parent
 Set-Location $repoRoot
 
-$defaultModelPath = "C:\Users\loudo\Desktop\bonsai-chatbot\bonsai-chatbot\models\bonsai-gguf.gguf"
+$defaultModelPath = Join-Path $repoRoot "models\bonsai-gguf.gguf"
 $defaultServerBinary = "C:\Users\loudo\llama.cpp\build\bin\Release\llama-server.exe"
 $logsDir = Join-Path $repoRoot "logs"
 $modelStdout = Join-Path $logsDir "llama-server-stdout.log"
